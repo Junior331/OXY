@@ -1,0 +1,391 @@
+import json
+import logging
+import re
+from datetime import date, timedelta
+from db import get_connection
+
+_UUID_RE = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+
+
+def _is_uuid(val) -> bool:
+    return bool(val and _UUID_RE.match(str(val)))
+
+logger = logging.getLogger("ai-service.tools.lodging")
+
+
+def _time_to_hhmm(val) -> str | None:
+    """Normaliza TIME do Postgres para HH:MM."""
+    if val is None:
+        return None
+    if hasattr(val, "strftime"):
+        return val.strftime("%H:%M")
+    s = str(val).strip()
+    return s[:5] if len(s) >= 5 else s
+
+
+def _last_use_day(checkin: date, checkout: date) -> date:
+    """Último dia civil de uso (checkout no banco é fim exclusivo). Nunca persistir isto em checkout_date."""
+    return checkout - timedelta(days=1)
+
+
+def build_lodging_tools(company_id: int, client_id, lodging_type: str = "hotel") -> list:
+    """Tools do agente de hospedagem."""
+
+    def get_kennel_availability(checkin_date: str, checkout_date: str) -> dict:
+        """
+        Verifica vagas disponíveis no período de hospedagem.
+        Chamar SEMPRE que o cliente mencionar datas de check-in/check-out.
+        """
+        try:
+            checkin = date.fromisoformat(checkin_date)
+            checkout = date.fromisoformat(checkout_date)
+        except ValueError:
+            return {"success": False, "message": "Datas inválidas. Use o formato YYYY-MM-DD."}
+
+        if checkout <= checkin:
+            return {"success": False, "message": "Data de saída deve ser posterior à entrada."}
+
+        if checkin < date.today():
+            return {"success": False, "message": "Data de check-in não pode ser no passado."}
+
+        days = (checkout - checkin).days
+
+        # Verifica disponibilidade e busca configuração (taxa diária incluída)
+        # Toda a lógica de consulta fica dentro de um único bloco de conexão
+        nearest_checkin = None
+        nearest_checkout = None
+        daily_rate_val = None
+        min_vagas = 0
+
+        with get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT hotel_enabled, daycare_enabled, hotel_daily_rate, daycare_daily_rate,
+                       daycare_checkin_time, daycare_checkout_time
+                FROM clinica_lodging_config
+                WHERE company_id = %s
+                """,
+                (company_id,),
+            )
+            cfg = cur.fetchone()
+            enabled = (cfg["hotel_enabled"] if lodging_type == "hotel" else cfg["daycare_enabled"]) if cfg else None
+            rate_key = "hotel_daily_rate" if lodging_type == "hotel" else "daycare_daily_rate"
+            if not cfg or not enabled:
+                service_name = "Hotel" if lodging_type == "hotel" else "Creche"
+                return {"success": False, "message": f"{service_name} não está disponível no momento."}
+
+            daily_rate_val = float(cfg[rate_key]) if cfg[rate_key] else None
+            daycare_pickup = _time_to_hhmm(cfg.get("daycare_checkout_time"))
+
+            # Disponibilidade do período solicitado
+            cur.execute("""
+                SELECT MIN(available_capacity) AS min_vagas
+                FROM vw_lodging_availability
+                WHERE company_id = %s
+                  AND type       = %s
+                  AND check_date BETWEEN %s AND (%s::date - INTERVAL '1 day')
+            """, (company_id, lodging_type, checkin_date, checkout_date))
+            row = cur.fetchone()
+            min_vagas = row["min_vagas"] if row and row["min_vagas"] is not None else 0
+
+            if min_vagas <= 0:
+                # Busca o próximo período disponível da mesma duração — dentro da mesma conexão
+                for offset in range(1, 61):
+                    candidate_in = checkin + timedelta(days=offset)
+                    candidate_out = candidate_in + timedelta(days=days)
+                    cur.execute("""
+                        SELECT MIN(available_capacity) AS min_vagas
+                        FROM vw_lodging_availability
+                        WHERE company_id = %s
+                          AND type       = %s
+                          AND check_date BETWEEN %s AND (%s::date - INTERVAL '1 day')
+                    """, (company_id, lodging_type, str(candidate_in), str(candidate_out)))
+                    r = cur.fetchone()
+                    if r and r["min_vagas"] is not None and int(r["min_vagas"]) > 0:
+                        nearest_checkin = candidate_in
+                        nearest_checkout = candidate_out
+                        break
+
+        if min_vagas <= 0:
+            if nearest_checkin:
+                nearest_info = (
+                    f"Próxima disponibilidade encontrada: "
+                    f"{nearest_checkin.strftime('%d/%m/%Y')} a {nearest_checkout.strftime('%d/%m/%Y')} "
+                    f"({days} dia{'s' if days > 1 else ''})."
+                )
+                return {
+                    "success": False,
+                    "available": False,
+                    "days": days,
+                    "nearest_available": {
+                        "checkin_date": str(nearest_checkin),
+                        "checkout_date": str(nearest_checkout),
+                        "days": days,
+                    },
+                    "message": (
+                        f"Sem vagas no período solicitado ({checkin_date} a {checkout_date}). "
+                        f"{nearest_info} Ofereça este período ao cliente."
+                    ),
+                }
+            return {
+                "success": False,
+                "available": False,
+                "days": days,
+                "message": (
+                    f"Sem vagas disponíveis nos próximos 60 dias a partir de {checkin_date}. "
+                    "Informe o cliente e peça novas datas."
+                ),
+            }
+
+        total = round(daily_rate_val * days, 2) if daily_rate_val else None
+        rate_info = f"R${daily_rate_val:.2f}/dia" if daily_rate_val else "valor a combinar"
+        total_info = f"Total: R${total:.2f} ({days} dia{'s' if days > 1 else ''})" if total else ""
+
+        last_day = _last_use_day(checkin, checkout)
+        pickup_phrase = daycare_pickup or "horário da loja"
+
+        if lodging_type == "daycare":
+            if last_day == checkin:
+                msg = (
+                    f"Há vaga(s) na creche para o dia {checkin.strftime('%d/%m/%Y')} (1 diária). "
+                    f"{rate_info}. {total_info}. "
+                    f"Retirada no mesmo dia até {pickup_phrase}."
+                ).strip()
+            else:
+                msg = (
+                    f"Há vaga(s) na creche de {checkin.strftime('%d/%m/%Y')} a {last_day.strftime('%d/%m/%Y')} "
+                    f"({days} diárias). {rate_info}. {total_info}. "
+                    f"Retirada no último dia ({last_day.strftime('%d/%m/%Y')}) até {pickup_phrase}."
+                ).strip()
+            out = {
+                "success": True,
+                "available": True,
+                "available_capacity": int(min_vagas),
+                "days": days,
+                "daily_rate": daily_rate_val,
+                "total_amount": total,
+                "checkin_date": checkin_date,
+                "checkout_date": checkout_date,
+                "message": msg,
+                "last_day_client": str(last_day),
+                "pickup_time_hint": daycare_pickup,
+            }
+            return out
+
+        msg = f"Há vaga(s) disponíveis. {rate_info}. {total_info}".strip()
+        return {
+            "success": True,
+            "available": True,
+            "available_capacity": int(min_vagas),
+            "days": days,
+            "daily_rate": daily_rate_val,
+            "total_amount": total,
+            "checkin_date": checkin_date,
+            "checkout_date": checkout_date,
+            "message": msg,
+        }
+
+    def create_lodging(
+        pacienteid: str,
+        checkin_date: str,
+        checkout_date: str,
+        daily_rate: float = None,
+        care_notes: dict = None,
+        confirmed: bool = False,
+    ) -> dict:
+        """
+        Cria uma reserva de hospedagem. Exige confirmed=True — nunca criar sem confirmação explícita do cliente.
+
+        Args:
+            pacienteid: ID do paciente (obtido via get_client_pets)
+            checkin_date: Data de entrada YYYY-MM-DD
+            checkout_date: Data de saída YYYY-MM-DD
+            daily_rate: Valor diário — opcional
+            care_notes: Instruções de cuidado — opcional
+            confirmed: Deve ser True — só confirmar após aceite explícito do cliente
+        """
+        if not confirmed:
+            return {"success": False, "message": "Aguardando confirmação explícita do cliente antes de criar a hospedagem."}
+
+        if not client_id:
+            return {"success": False, "message": "Cliente não identificado."}
+
+        if not _is_uuid(pacienteid):
+            return {
+                "success": False,
+                "message": (
+                    f"pacienteid inválido: '{pacienteid}' não é um UUID. "
+                    "Chame get_client_pets para obter o ID correto do paciente antes de criar a hospedagem."
+                ),
+            }
+
+        try:
+            checkin = date.fromisoformat(checkin_date)
+            checkout = date.fromisoformat(checkout_date)
+        except ValueError:
+            return {"success": False, "message": "Datas inválidas. Use o formato YYYY-MM-DD."}
+
+        if checkout <= checkin:
+            return {"success": False, "message": "Data de saída deve ser posterior à data de entrada."}
+
+        # Verifica se o tipo está habilitado e busca taxa diária e horários (creche)
+        with get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT hotel_enabled, daycare_enabled, hotel_daily_rate, daycare_daily_rate,
+                       daycare_checkout_time
+                FROM clinica_lodging_config
+                WHERE company_id = %s
+                """,
+                (company_id,),
+            )
+            config = cur.fetchone()
+            enabled = (
+                (config["hotel_enabled"] if lodging_type == "hotel" else config["daycare_enabled"])
+                if config
+                else None
+            )
+            rate_key = "hotel_daily_rate" if lodging_type == "hotel" else "daycare_daily_rate"
+            if not config or not enabled:
+                service_name = "Hotel" if lodging_type == "hotel" else "Creche"
+                return {"success": False, "message": f"{service_name} não está disponível no momento."}
+
+            daycare_pickup = _time_to_hhmm(config.get("daycare_checkout_time"))
+
+            # Usa a taxa configurada se o agente não passou explicitamente
+            if daily_rate is None and config[rate_key]:
+                daily_rate = float(config[rate_key])
+
+        days = (checkout - checkin).days
+        total_amount = round(float(daily_rate) * days, 2) if daily_rate else None
+
+        with get_connection() as conn:
+            cur = conn.cursor()
+
+            # Verifica paciente
+            cur.execute(
+                "SELECT id, name FROM clinica_pacientes WHERE id = %s AND client_id = %s AND company_id = %s AND is_active = TRUE",
+                (pacienteid, client_id, company_id)
+            )
+            paciente = cur.fetchone()
+            if not paciente:
+                return {"success": False, "message": "Paciente não encontrado. Use get_client_pets para obter os IDs corretos."}
+
+            cur.execute("""
+                INSERT INTO clinica_lodging_reservations
+                    (company_id, client_id, pacienteid, type, checkin_date, checkout_date,
+                     daily_rate, total_amount, care_notes, status, confirmed)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'confirmed', TRUE)
+                RETURNING id
+            """, (company_id, client_id, pacienteid, lodging_type, checkin_date, checkout_date,
+                  daily_rate, total_amount, json.dumps(care_notes or {})))
+            lodging_id = cur.fetchone()["id"]
+
+            cur.execute(
+                "UPDATE clients SET conversation_stage = 'completed', updated_at = NOW() WHERE id = %s AND company_id = %s",
+                (client_id, company_id)
+            )
+
+        pickup_phrase = daycare_pickup or "horário da loja"
+        last_day = _last_use_day(checkin, checkout)
+
+        if lodging_type == "daycare":
+            if last_day == checkin:
+                confirm_msg = (
+                    f"Creche confirmada para o dia {checkin.strftime('%d/%m/%Y')} (1 diária). "
+                    f"Retirada no mesmo dia até {pickup_phrase}."
+                )
+            else:
+                confirm_msg = (
+                    f"Creche confirmada de {checkin.strftime('%d/%m/%Y')} a {last_day.strftime('%d/%m/%Y')} "
+                    f"({days} diárias). Retirada no último dia ({last_day.strftime('%d/%m/%Y')}) até {pickup_phrase}."
+                )
+            return {
+                "success": True,
+                "lodging_id": str(lodging_id),
+                "days": days,
+                "total_amount": total_amount,
+                "message": confirm_msg,
+                "checkin_date": checkin_date,
+                "checkout_date": checkout_date,
+                "last_day_client": str(last_day),
+                "pickup_time_hint": daycare_pickup,
+            }
+
+        confirm_msg = (
+            f"Hospedagem confirmada! Check-in {checkin_date}, check-out {checkout_date} ({days} dias)."
+        )
+        return {
+            "success": True,
+            "lodging_id": str(lodging_id),
+            "days": days,
+            "total_amount": total_amount,
+            "message": confirm_msg,
+        }
+
+    def cancel_lodging(lodging_id: str, reason: str = None) -> dict:
+        """
+        Cancela uma hospedagem existente.
+
+        Args:
+            lodging_id: ID da hospedagem
+            reason: Motivo do cancelamento (opcional)
+        """
+        if not lodging_id:
+            return {"success": False, "message": "lodging_id é obrigatório."}
+
+        with get_connection() as conn:
+            cur = conn.cursor()
+            cur.execute("""
+                UPDATE clinica_lodging_reservations
+                SET status = 'cancelled', updated_at = NOW()
+                WHERE id = %s AND company_id = %s AND client_id = %s
+                  AND status NOT IN ('checked_out', 'cancelled')
+                RETURNING id
+            """, (lodging_id, company_id, client_id))
+            updated = cur.fetchone()
+
+        if not updated:
+            return {"success": False, "message": "Hospedagem não encontrada ou já finalizada."}
+        return {"success": True, "message": "Hospedagem cancelada com sucesso."}
+
+    def get_lodging_status(lodging_id: str = None) -> dict:
+        """
+        Retorna status da hospedagem ativa do cliente.
+
+        Args:
+            lodging_id: ID específico da hospedagem (opcional — se não informado, retorna a mais recente ativa)
+        """
+        with get_connection() as conn:
+            cur = conn.cursor()
+            if lodging_id:
+                cur.execute("""
+                    SELECT l.id, l.kennel_id, l.checkin_date, l.checkout_date, l.status,
+                           l.total_amount, p.name AS pacientename
+                    FROM clinica_lodging_reservations l
+                    JOIN clinica_pacientes p ON p.id = l.pacienteid
+                    WHERE l.id = %s AND l.company_id = %s AND l.client_id = %s
+                """, (lodging_id, company_id, client_id))
+            else:
+                cur.execute("""
+                    SELECT l.id, l.kennel_id, l.checkin_date, l.checkout_date, l.status,
+                           l.total_amount, p.name AS pacientename
+                    FROM clinica_lodging_reservations l
+                    JOIN clinica_pacientes p ON p.id = l.pacienteid
+                    WHERE l.company_id = %s AND l.client_id = %s
+                      AND l.status NOT IN ('cancelled', 'checked_out')
+                    ORDER BY l.checkin_date DESC
+                    LIMIT 1
+                """, (company_id, client_id))
+            row = cur.fetchone()
+
+        if not row:
+            return {"found": False, "message": "Nenhuma hospedagem ativa encontrada."}
+        return {"found": True, **dict(row)}
+
+    return [get_kennel_availability, create_lodging, cancel_lodging, get_lodging_status]

@@ -1,0 +1,491 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CORE — MULTI-TENANT
+// ═══════════════════════════════════════════════════════════════
+
+model SaasCompany {
+  id        Int       @id @default(autoincrement())
+  name      String    @db.VarChar(200)
+  slug      String    @unique @db.VarChar(100)
+  plan      String?   @default("free") @db.VarChar(50)
+  isActive       Boolean?  @default(true) @map("is_active")
+  pangeiaSupport String?   @default("5511963482461") @map("pangeia_support") @db.VarChar(20)
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  users         SaasUser[]
+  clinicaProfile ClinicaProfile?
+  clients       Client[]
+  sessions      WhatsappSession[]
+  conversations AgentConversation[]
+  messages      AgentMessage[]
+
+  clinicaSpecialties    ClinicaSpecialty[]
+  clinicaServices       ClinicaService[]
+  clinicaSchedules      ClinicaSchedule[]
+  clinicaSlots          ClinicaSlot[]
+  clinicaAppointments   ClinicaAppointment[]
+  clinicaLodgings       ClinicaLodging[]
+  specialtyCapacityRules SpecialtyCapacityRule[]
+  clinicaBusinessHours  ClinicaBusinessHours[]
+
+  lodgingConfig       ClinicaLodgingConfig?
+  lodgingCapacities   ClinicaLodgingCapacity[]
+  lodgingReservations ClinicaLodgingReservation[]
+
+  @@map("saas_companies")
+}
+
+model SaasUser {
+  id             Int       @id @default(autoincrement())
+  companyId      Int       @map("company_id")
+  email          String    @unique @db.VarChar(255)
+  name           String    @db.VarChar(255)
+  hashedPassword String    @map("hashed_password") @db.VarChar(255)
+  role           String?   @default("staff") @db.VarChar(50)
+  isActive       Boolean?  @default(true) @map("is_active")
+  isSuperuser    Boolean?  @default(false) @map("is_superuser")
+  lastLogin      DateTime? @map("last_login") @db.Timestamptz(6)
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  company SaasCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId], map: "idx_users_company")
+  @@map("saas_users")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PERFIL DO NICHO (1:1 com company)
+// ═══════════════════════════════════════════════════════════════
+
+model ClinicaProfile {
+  id               Int       @id @default(autoincrement())
+  companyId        Int       @unique @map("company_id")
+  address          String?   @db.VarChar(500)
+  cep              String?   @db.VarChar(10)
+  phone            String    @db.VarChar(20)
+  latitude         Float?
+  longitude        Float?
+  ownerPhone       String?   @map("owner_phone") @db.VarChar(20)
+  emergencyContact String?   @map("emergency_contact") @db.VarChar(20)
+  assistantName    String?   @map("assistant_name") @db.VarChar(50)
+  features         Json?     @default("{}")
+  isActive         Boolean?  @default(true) @map("is_active")
+  createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company SaasCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId], map: "idx_clinica_profile_company")
+  @@map("clinica_profile")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLIENTES E WHATSAPP
+// ═══════════════════════════════════════════════════════════════
+
+model Client {
+  id                     String    @id @default(uuid()) @db.Uuid
+  companyId              Int       @map("company_id")
+  sessionId              String?   @map("session_id") @db.VarChar(256)
+  phone                  String    @db.VarChar(20)
+  // Apenas visualizacao no frontend. Nao interfere no envio/recepcao de mensagens,
+  // que continuam usando `phone`.
+  manualPhone           String?   @map("manual_phone") @db.VarChar(30)
+  name                   String?   @db.VarChar(255)
+  companyName            String?   @map("company") @db.VarChar(255)
+  email                  String?   @db.VarChar(255)
+  marketingConsent       Boolean?  @default(false) @map("marketing_consent")
+  source                 String?   @db.VarChar(100)
+  conversationStage      String?   @map("conversation_stage") @db.VarChar(50)
+  specialtyIdentified    String?   @map("specialty_identified") @db.VarChar(100)
+  professionalPreference String?   @map("professional_preference") @db.VarChar(100)
+  urgency                String?   @db.VarChar(20)
+  kanbanColumn           String?   @map("kanban_column") @db.VarChar(50)
+  notes                  String?
+  aiPaused               Boolean?  @default(false) @map("ai_paused")
+  aiPausedAt             DateTime? @map("ai_paused_at") @db.Timestamptz(6)
+  aiPauseReason          String?   @map("ai_pause_reason")
+  isActive               Boolean?  @default(true) @map("is_active")
+  createdAt              DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+  lastMessageAt          DateTime? @map("last_message_at") @db.Timestamptz(6)
+
+  saasCompany          SaasCompany               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  conversations        AgentConversation[]
+  pacientes                 ClinicaPaciente[]
+  appointments         ClinicaAppointment[]
+  lodgings             ClinicaLodging[]
+  lodgingReservations  ClinicaLodgingReservation[]
+
+  @@unique([companyId, phone])
+  @@index([companyId], map: "idx_clients_company")
+  @@index([phone], map: "idx_clients_phone")
+  @@map("clients")
+}
+
+model WhatsappSession {
+  id           String    @id @default(uuid()) @db.Uuid
+  companyId    Int       @unique @map("company_id")
+  instanceName String    @map("instance_name") @db.VarChar(100)
+  phoneNumber  String?   @map("phone_number") @db.VarChar(20)
+  status       String?   @default("disconnected") @db.VarChar(50)
+  qrCode       String?   @map("qr_code")
+  connectedAt  DateTime? @map("connected_at") @db.Timestamptz(6)
+  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  saasCompany SaasCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId], map: "idx_sessions_company")
+  @@index([instanceName], map: "idx_sessions_instance")
+  @@map("whatsapp_sessions")
+}
+
+model AgentConversation {
+  id             String    @id @default(uuid()) @db.Uuid
+  companyId      Int       @map("company_id")
+  clientId       String?   @map("client_id") @db.Uuid
+  whatsappNumber String?   @map("whatsapp_number") @db.VarChar(20)
+  startedAt      DateTime? @default(now()) @map("started_at") @db.Timestamptz(6)
+  lastMessageAt  DateTime? @map("last_message_at") @db.Timestamptz(6)
+
+  saasCompany SaasCompany    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client      Client?        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  messages    AgentMessage[]
+
+  @@index([companyId], map: "idx_conversations_company")
+  @@index([clientId], map: "idx_conversations_client")
+  @@map("agent_conversations")
+}
+
+model AgentMessage {
+  id             String    @id @default(uuid()) @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  companyId      Int       @map("company_id")
+  role           String    @db.VarChar(20)
+  content        String
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  saasCompany  SaasCompany       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  conversation AgentConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([companyId], map: "idx_messages_company")
+  @@index([conversationId], map: "idx_messages_conversation")
+  @@map("agent_messages")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLÍNICA — ESPECIALIDADES E CAPACIDADE
+// ═══════════════════════════════════════════════════════════════
+
+model ClinicaSpecialty {
+  id          String    @id @default(uuid()) @db.Uuid
+  companyId   Int       @map("company_id")
+  name        String    @db.VarChar(100)
+  color       String?   @db.VarChar(7)
+  description String?
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company       SaasCompany             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  capacityRules SpecialtyCapacityRule[]
+  slots         ClinicaSlot[]
+  services      ClinicaService[]
+  lodgings      ClinicaLodging[]
+
+  @@unique([companyId, name])
+  @@index([companyId], map: "idx_specialties_company")
+  @@map("clinica_specialties")
+}
+
+model SpecialtyCapacityRule {
+  id          String   @id @default(uuid()) @db.Uuid
+  specialtyId String   @map("specialty_id") @db.Uuid
+  companyId   Int      @map("company_id")
+  dayOfWeek   Int      @map("day_of_week") @db.SmallInt
+  slotTime    DateTime @map("slot_time") @db.Time
+  maxCapacity Int      @default(1) @map("max_capacity")
+  isActive    Boolean  @default(true) @map("is_active")
+
+  specialty ClinicaSpecialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+  company   SaasCompany      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  slots     ClinicaSlot[]
+
+  @@unique([specialtyId, dayOfWeek, slotTime])
+  @@index([specialtyId], map: "idx_capacity_rules_specialty")
+  @@index([companyId], map: "idx_capacity_rules_company")
+  @@map("specialty_capacity_rules")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HORÁRIO DE FUNCIONAMENTO (fonte de verdade para agenda)
+// ═══════════════════════════════════════════════════════════════
+
+model ClinicaBusinessHours {
+  id        String    @id @default(uuid()) @db.Uuid
+  companyId Int       @map("company_id")
+  dayOfWeek Int       @map("day_of_week") @db.SmallInt
+  openTime  DateTime? @map("open_time") @db.Time
+  closeTime DateTime? @map("close_time") @db.Time
+  isClosed  Boolean   @default(false) @map("is_closed")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company SaasCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, dayOfWeek])
+  @@index([companyId], map: "idx_business_hours_company")
+  @@map("clinica_business_hours")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLÍNICA — TABELAS OPERACIONAIS
+// ═══════════════════════════════════════════════════════════════
+
+model ClinicaService {
+  id          Int       @id @default(autoincrement())
+  companyId   Int       @map("company_id")
+  specialtyId String?   @map("specialty_id") @db.Uuid
+  name        String    @db.VarChar(200)
+  description String?
+  durationMin Int       @default(60) @map("duration_min")
+  price       Decimal?  @db.Decimal(10, 2)
+  priceBySize Json?     @map("price_by_size")
+  // Formato: {"P": 50.00, "M": 70.00, "G": 90.00, "GG": 110.00}
+  requiresVet Boolean   @default(false) @map("requires_vet")
+  durationMultiplierLarge Decimal? @map("duration_multiplier_large") @db.Decimal(3, 1)
+  isActive    Boolean?  @default(true) @map("is_active")
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  saasCompany  SaasCompany          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  specialty    ClinicaSpecialty?    @relation(fields: [specialtyId], references: [id])
+  appointments ClinicaAppointment[]
+
+  @@index([companyId], map: "idx_services_company")
+  @@index([specialtyId], map: "idx_services_specialty")
+  @@map("clinica_services")
+}
+
+model ClinicaSlot {
+  id           String    @id @default(uuid()) @db.Uuid
+  companyId    Int       @map("company_id")
+  specialtyId  String    @map("specialty_id") @db.Uuid
+  slotDate     DateTime  @map("slot_date") @db.Date
+  slotTime     DateTime  @map("slot_time") @db.Time
+  maxCapacity  Int       @map("max_capacity")
+  usedCapacity Int       @default(0) @map("used_capacity")
+  isBlocked    Boolean   @default(false) @map("is_blocked")
+  ruleId       String?   @map("rule_id") @db.Uuid
+  blockedAt    DateTime? @map("blocked_at") @db.Timestamptz(6)
+  blockReason  String?   @map("block_reason") @db.VarChar(50)
+
+  company      SaasCompany            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  specialty    ClinicaSpecialty       @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+  rule         SpecialtyCapacityRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  appointments ClinicaAppointment[]
+
+  @@unique([specialtyId, slotDate, slotTime])
+  @@index([companyId, slotDate], map: "idx_slots_company_date")
+  @@index([specialtyId, slotDate], map: "idx_slots_specialty")
+  @@index([companyId, isBlocked, slotDate], map: "idx_slots_blocked")
+  @@map("clinica_slots")
+}
+
+model ClinicaPaciente {
+  id           String    @id @default(uuid()) @db.Uuid
+  companyId    Int       @map("company_id")
+  clientId     String    @map("client_id") @db.Uuid
+  name         String    @db.VarChar(100)
+  species      String?   @db.VarChar(50)
+  breed        String?   @db.VarChar(100)
+  birthDate    DateTime? @map("birth_date") @db.Date
+  weightKg     Decimal?  @map("weight_kg") @db.Decimal(5, 2)
+  gender       String?   @db.VarChar(10)
+  size         String?   @db.VarChar(10)   // P | M | G | GG
+  coatType     String?   @map("coat_type") @db.VarChar(50)
+  medicalNotes Json?     @default("{}") @map("medical_notes")
+  // Formato: {"alergias": [], "vacinas": [], "medicamentos": [], "observacoes": ""}
+  notes        String?
+  isActive     Boolean?  @default(true) @map("is_active")
+  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  client               Client                    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  appointments         ClinicaAppointment[]
+  lodgings             ClinicaLodging[]
+  lodgingReservations  ClinicaLodgingReservation[]
+
+  @@index([companyId], map: "idx_pets_company")
+  @@index([clientId], map: "idx_pets_client")
+  @@map("clinica_pacientes")
+}
+
+// Mantida para compatibilidade com código legado (será removida em versão futura)
+model ClinicaSchedule {
+  id        Int       @id @default(autoincrement())
+  companyId Int       @map("company_id")
+  weekday   Int       @db.SmallInt
+  startTime DateTime  @map("start_time") @db.Time
+  endTime   DateTime  @map("end_time") @db.Time
+  capacity  Int       @default(1)
+  isActive  Boolean?  @default(true) @map("is_active")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  saasCompany  SaasCompany          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  appointments ClinicaAppointment[]
+
+  @@unique([companyId, weekday, startTime])
+  @@index([companyId], map: "idx_schedules_company")
+  @@map("clinica_schedules")
+}
+
+model ClinicaAppointment {
+  id            String    @id @default(uuid()) @db.Uuid
+  companyId     Int       @map("company_id")
+  clientId      String    @map("client_id") @db.Uuid
+  pacienteId    String    @map("paciente_id") @db.Uuid
+  serviceId     Int       @map("service_id")
+  slotId        String?   @map("slot_id") @db.Uuid
+  scheduleId    Int?      @map("schedule_id")
+  scheduledDate DateTime? @map("scheduled_date") @db.Date
+  status        String    @default("pending") @db.VarChar(30)
+  confirmed     Boolean   @default(false)
+  notes         String?
+  priceCharged  Decimal?  @map("price_charged") @db.Decimal(10, 2)
+  source        String?   @db.VarChar(50)
+  cancelledAt   DateTime? @map("cancelled_at") @db.Timestamptz(6)
+  cancelReason  String?   @map("cancel_reason")
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  saasCompany SaasCompany      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client      Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  paciente    ClinicaPaciente  @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  service     ClinicaService   @relation(fields: [serviceId], references: [id])
+  slot        ClinicaSlot?     @relation(fields: [slotId], references: [id])
+  schedule    ClinicaSchedule? @relation(fields: [scheduleId], references: [id])
+
+  @@index([slotId],       map: "idx_appointments_slot")
+  @@index([companyId],    map: "idx_appointments_company")
+  @@index([clientId],     map: "idx_appointments_client")
+  @@index([pacienteId],   map: "idx_appointments_pet")
+  @@index([scheduledDate], map: "idx_appointments_date")
+  @@index([status],       map: "idx_appointments_status")
+  @@map("clinica_appointments")
+}
+
+model ClinicaLodging {
+  id           String    @id @default(uuid()) @db.Uuid
+  companyId    Int       @map("company_id")
+  clientId     String    @map("client_id") @db.Uuid
+  pacienteId   String    @map("paciente_id") @db.Uuid
+  specialtyId  String?   @map("specialty_id") @db.Uuid
+  kennelId     String?   @map("kennel_id") @db.VarChar(50)
+  checkinDate  DateTime  @map("checkin_date") @db.Date
+  checkoutDate DateTime  @map("checkout_date") @db.Date
+  checkinTime  DateTime  @default(dbgenerated("'08:00'::time")) @map("checkin_time") @db.Time
+  checkoutTime DateTime  @default(dbgenerated("'18:00'::time")) @map("checkout_time") @db.Time
+  status       String    @default("pending") @db.VarChar(30)
+  confirmed    Boolean   @default(false)
+  dailyRate    Decimal?  @map("daily_rate") @db.Decimal(10, 2)
+  totalAmount  Decimal?  @map("total_amount") @db.Decimal(10, 2)
+  careNotes    Json?     @default("{}") @map("care_notes")
+  emergencyVet String?   @map("emergency_vet") @db.VarChar(100)
+  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  company   SaasCompany       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client    Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  paciente  ClinicaPaciente   @relation(fields: [pacienteId], references: [id])
+  specialty ClinicaSpecialty? @relation(fields: [specialtyId], references: [id])
+
+  @@index([companyId, checkinDate, checkoutDate], map: "idx_lodgings_company_dates")
+  @@index([pacienteId], map: "idx_lodgings_pet")
+  @@index([clientId],   map: "idx_lodgings_client")
+  @@map("clinica_lodgings")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SISTEMA DE HOSPEDAGEM (Hotel e Creche) — novo módulo dedicado
+// ═══════════════════════════════════════════════════════════════
+
+model ClinicaLodgingConfig {
+  id                  String    @id @default(uuid()) @db.Uuid
+  companyId           Int       @unique @map("company_id")
+
+  hotelEnabled        Boolean   @default(false) @map("hotel_enabled")
+  hotelDailyRate      Decimal?  @map("hotel_daily_rate") @db.Decimal(10, 2)
+  hotelCheckinTime    DateTime  @default(dbgenerated("'08:00'::time")) @map("hotel_checkin_time") @db.Time
+  hotelCheckoutTime   DateTime  @default(dbgenerated("'18:00'::time")) @map("hotel_checkout_time") @db.Time
+
+  daycareEnabled      Boolean   @default(false) @map("daycare_enabled")
+  daycareDailyRate    Decimal?  @map("daycare_daily_rate") @db.Decimal(10, 2)
+  daycareCheckinTime  DateTime  @default(dbgenerated("'07:00'::time")) @map("daycare_checkin_time") @db.Time
+  daycareCheckoutTime DateTime  @default(dbgenerated("'19:00'::time")) @map("daycare_checkout_time") @db.Time
+
+  createdAt           DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  saasCompany SaasCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId], map: "idx_lodging_config_company")
+  @@map("clinica_lodging_config")
+}
+
+model ClinicaLodgingCapacity {
+  id          String  @id @default(uuid()) @db.Uuid
+  companyId   Int     @map("company_id")
+  type        String  @db.VarChar(10)   // 'hotel' | 'daycare'
+  dayOfWeek   Int     @map("day_of_week") @db.SmallInt  // 0=dom..6=sab
+  maxCapacity Int     @default(0) @map("max_capacity")
+  isActive    Boolean @default(true) @map("is_active")
+
+  saasCompany SaasCompany @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, type, dayOfWeek])
+  @@index([companyId], map: "idx_lodging_capacity_company")
+  @@map("clinica_lodging_capacity")
+}
+
+model ClinicaLodgingReservation {
+  id               String    @id @default(uuid()) @db.Uuid
+  companyId        Int       @map("company_id")
+  clientId         String    @map("client_id") @db.Uuid
+  pacienteId       String    @map("paciente_id") @db.Uuid
+  type             String    @db.VarChar(10)   // 'hotel' | 'daycare'
+  checkinDate      DateTime  @map("checkin_date") @db.Date
+  checkoutDate     DateTime  @map("checkout_date") @db.Date
+  checkinTime      DateTime? @map("checkin_time") @db.Time
+  checkoutTime     DateTime? @map("checkout_time") @db.Time
+  kennelId         String?   @map("kennel_id") @db.VarChar(50)
+  status           String    @default("confirmed") @db.VarChar(30)
+  confirmed        Boolean   @default(false)
+  dailyRate        Decimal?  @map("daily_rate") @db.Decimal(10, 2)
+  totalAmount      Decimal?  @map("total_amount") @db.Decimal(10, 2)
+  careNotes        Json?     @default("{}") @map("care_notes")
+  emergencyContact String?   @map("emergency_contact") @db.VarChar(100)
+  createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime? @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  saasCompany SaasCompany     @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  client      Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  paciente    ClinicaPaciente @relation(fields: [pacienteId], references: [id])
+
+  @@index([companyId], map: "idx_lodging_res_company")
+  @@index([clientId],  map: "idx_lodging_res_client")
+  @@index([pacienteId], map: "idx_lodging_res_pet")
+  @@index([companyId, checkinDate, checkoutDate], map: "idx_lodging_res_dates")
+  @@index([companyId, type, checkinDate],         map: "idx_lodging_res_type")
+  @@map("clinica_lodging_reservations")
+}

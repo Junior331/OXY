@@ -1,0 +1,1900 @@
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Search,
+  Plus,
+  Phone,
+  Mail,
+  MoreVertical,
+  MessageCircle,
+  Trash2,
+  Edit,
+  PawPrint,
+  Calendar,
+  ArrowLeft,
+  Loader2,
+} from "lucide-react";
+import { cn } from "@/lib/cn";
+import { normalizePetSize, pacienteSizeAbbrev, PACIENTE_SIZE_OPTIONS, PACIENTE_SIZE_OPTIONS_WITH_PLACEHOLDER } from "@/lib/pacienteSize";
+import { formatPhoneForDisplay, maskPhone, dateFromISO, dateToISO } from "@/lib/masks";
+import { useAddressByCep, useToast } from "@/hooks";
+import { useAuthContext } from "@/contexts";
+import { appointmentService, clientService, pacienteService } from "@/services";
+import { appointmentStatusFromApi } from "@/lib/appointmentStatus";
+import {
+  extractPairedAppointmentId,
+  idsForMergedDisplayRow,
+  mergePairedByTime,
+} from "@/lib/appointmentPair";
+import type {
+  Appointment as ApiAppointment,
+  Client,
+  Paciente as PacienteType,
+  Service,
+} from "@/types";
+
+import { DashboardLayout } from "@/components/templates/DashboardLayout";
+import { EmptyState } from "@/components/molecules/EmptyState";
+import { Modal } from "@/components/molecules/Modal";
+import { Input } from "@/components/atoms/Input";
+import { TextArea } from "@/components/atoms/TextArea";
+import { TextAreaField } from "@/components/molecules/TextAreaField";
+import { Button } from "@/components/atoms/Button";
+import { Select } from "@/components/atoms/Select";
+
+interface Paciente {
+  id: string;
+  customerId: string;
+  name: string;
+  species: "cachorro" | "gato" | "ave" | "roedor" | "outro";
+  breed: string;
+  age: string;
+  weight: string;
+  size: string;
+  color: string;
+  notes: string;
+}
+
+interface Appointment {
+  id: string;
+  customerId: string;
+  pacienteId: string;
+  scheduleId?: string;
+  pacienteName: string;
+  date: string;
+  time: string;
+  /** Fim exibido quando o serviço usa dois slots (par). */
+  timeEnd?: string;
+  service: string;
+  status: "confirmado" | "pendente" | "cancelado" | "concluido";
+  notes: string;
+  pairedAppointmentId?: string;
+}
+
+interface ConversationHistory {
+  id: string;
+  date: string;
+  preview: string;
+  messageCount: number;
+  channel: "whatsapp" | "email" | "telefone";
+}
+
+interface Customer {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  // Apenas para visualizacao no frontend (nao usada para envio/recebimento).
+  manualPhone?: string;
+  status: "ativo" | "inativo";
+  address?: string;
+  notes?: string;
+  petsCount: number;
+  totalAppointments: number;
+  lastVisit: string;
+  pacientes: Paciente[];
+  appointments: Appointment[];
+  conversations: ConversationHistory[];
+}
+
+function getTodayYmd(): string {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function brDateToYmdSafe(br: string): string {
+  if (!br) return "";
+  const iso = dateToISO(br);
+  return /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso : "";
+}
+
+function getInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((word) => word[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function getSpeciesEmoji(species: Paciente["species"]) {
+  switch (species) {
+    case "cachorro":
+      return "🐕";
+    case "gato":
+      return "🐱";
+    case "ave":
+      return "🐦";
+    case "roedor":
+      return "🐹";
+    default:
+      return "🐾";
+  }
+}
+
+function getStatusBadgeStyle(status: Appointment["status"]) {
+  const styles = {
+    confirmado: "bg-[#1E62EC]/20 text-[#1E62EC] border-[#1E62EC]/30",
+    pendente: "bg-[#F59E0B]/20 text-[#F59E0B] border-[#F59E0B]/30",
+    cancelado: "bg-red-500/20 text-red-500 border-red-500/30",
+    concluido: "bg-[#3DCA21]/20 text-[#3DCA21] border-[#3DCA21]/30",
+  };
+  return styles[status];
+}
+
+function getChannelIcon(channel: ConversationHistory["channel"]) {
+  switch (channel) {
+    case "whatsapp":
+      return <MessageCircle className="h-4 w-4 text-[#25D366]" />;
+    case "email":
+      return <Mail className="h-4 w-4 text-[#1E62EC]" />;
+    case "telefone":
+      return <Phone className="h-4 w-4 text-[#9333EA]" />;
+  }
+}
+
+function formatClientPhoneForSidebar(phone: string): string {
+  // Quando o sistema envia um identificador tipo "@lid" (ou qualquer valor com letras),
+  // mostramos uma mensagem neutra apenas na UI.
+  if (!phone) return "—";
+  if (phone.includes("@") || /[a-z]/i.test(phone)) return "Numero nao identificado";
+  return phone;
+}
+
+function getClientPhoneDisplay(customer: Customer): string {
+  const manual = customer.manualPhone?.trim();
+  if (!manual) return "Numero nao identificado";
+  if (manual.includes("@") || /[a-z]/i.test(manual)) {
+    return "Numero nao identificado";
+  }
+  return manual;
+}
+
+function ClientsSidebar({
+  customers,
+  selectedId,
+  onSelect,
+  searchQuery,
+  onSearchChange,
+  onNewCustomer,
+  loading,
+  error,
+}: {
+  customers: Customer[];
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
+  onNewCustomer: () => void;
+  loading?: boolean;
+  error?: string | null;
+}) {
+  const filteredCustomers = customers.filter(
+    (customer) =>
+      customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      customer.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      customer.phone.includes(searchQuery) ||
+      getClientPhoneDisplay(customer).includes(searchQuery),
+  );
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="p-4 border-b border-[#727B8E]/10 dark:border-[#40485A]">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-[#434A57] dark:text-[#f5f9fc]">
+            Clientes
+          </h2>
+          <button
+            type="button"
+            onClick={onNewCustomer}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-[#727B8E] transition-colors hover:bg-[#F4F6F9] dark:text-[#8a94a6] dark:hover:bg-[#212225]"
+          >
+            <Plus className="h-5 w-5" />
+          </button>
+        </div>
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#727B8E] dark:text-[#8a94a6]" />
+          <input
+            type="text"
+            placeholder="Buscar clientes..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full rounded-lg bg-[#F4F6F9] dark:bg-[#212225] border-none pl-10 pr-4 py-2.5 text-sm text-[#434A57] dark:text-[#f5f9fc] placeholder:text-[#727B8E] dark:placeholder:text-[#8a94a6] outline-none focus:ring-2 focus:ring-[#1E62EC]/20"
+          />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
+          <div className="flex h-32 items-center justify-center p-4">
+            <Loader2 className="h-8 w-8 animate-spin text-[#1E62EC]" />
+          </div>
+        ) : error ? (
+          <div className="flex flex-col h-full items-center justify-center gap-3 p-4 text-center">
+            <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+            <Button size="sm" variant="outline" onClick={onNewCustomer}>
+              Novo Cliente
+            </Button>
+          </div>
+        ) : filteredCustomers.length === 0 ? (
+          <div className="flex h-full items-center justify-center p-4">
+            <EmptyState
+              image="not_found_clientes_ativos"
+              description="Nenhum cliente encontrado."
+              buttonText="Novo Cliente"
+              buttonIcon={<Plus className="h-4 w-4" />}
+              onButtonClick={onNewCustomer}
+            />
+          </div>
+        ) : (
+          filteredCustomers.map((customer) => (
+            <motion.button
+              key={customer.id}
+              type="button"
+              onClick={() => onSelect(customer.id)}
+              whileHover={{ backgroundColor: "rgba(244, 246, 249, 0.5)" }}
+              className={`w-full p-4 text-left border-b border-[#727B8E]/5 dark:border-[#40485A]/50 transition-colors ${
+                selectedId === customer.id
+                  ? "bg-[#F4F6F9] dark:bg-[#212225]"
+                  : ""
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#1E62EC]/20">
+                  <span className="text-sm font-medium text-[#1E62EC]">
+                    {getInitials(customer.name)}
+                  </span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-medium text-[#434A57] dark:text-[#f5f9fc]">
+                      {customer.name}
+                    </span>
+                    <span
+                      className={`shrink-0 text-[10px] font-medium px-2 py-0.5 rounded-full border ${
+                        customer.status === "ativo"
+                          ? "bg-[#3DCA21]/20 text-[#3DCA21] border-[#3DCA21]/30"
+                          : "bg-[#727B8E]/20 text-[#727B8E] border-[#727B8E]/30"
+                      }`}
+                    >
+                      {customer.status}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#727B8E] dark:text-[#8a94a6] mt-1">
+                    {customer.petsCount} paciente
+                    {customer.petsCount !== 1 ? "s" : ""} •{" "}
+                    {formatClientPhoneForSidebar(getClientPhoneDisplay(customer))}
+                  </p>
+                  <p className="text-xs text-[#727B8E] dark:text-[#8a94a6] mt-0.5">
+                    {customer.totalAppointments} agendamentos
+                  </p>
+                </div>
+              </div>
+            </motion.button>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface PacienteFormData {
+  name: string;
+  species: string;
+  breed: string;
+  age: string;
+  weight: string;
+  size: string;
+  color: string;
+  notes: string;
+}
+
+const emptyPetForm: PacienteFormData = {
+  name: "",
+  species: "",
+  breed: "",
+  age: "",
+  weight: "",
+  size: "",
+  color: "",
+  notes: "",
+};
+
+function CustomerDetails({
+  customer,
+  onBack,
+  onEditCustomer,
+  onDeleteCustomer,
+  onDeletePet,
+  onDeleteAppointment,
+  deletingAppointmentId,
+  onSavePet,
+  onOpenConversation,
+  activeTab,
+  onTabChange,
+  loadingPets,
+  loadingAppointments,
+  loadingConversations,
+}: {
+  customer: Customer | null;
+  onBack: () => void;
+  onEditCustomer: () => void;
+  onDeleteCustomer: (id: string) => void;
+  onDeletePet: (pacienteId: string) => void;
+  onDeleteAppointment: (appointmentId: string) => void;
+  deletingAppointmentId?: string | null;
+  onSavePet: (
+    paciente: Omit<Paciente, "id" | "customerId">,
+    pacienteId?: string,
+  ) => Promise<void>;
+  onOpenConversation: (conversationId: string) => void;
+  activeTab: "pacientes" | "agendamentos" | "conversas";
+  onTabChange: (tab: "pacientes" | "agendamentos" | "conversas") => void;
+  loadingPets?: boolean;
+  loadingAppointments?: boolean;
+  loadingConversations?: boolean;
+}) {
+  const [pacienteModalOpen, setPetModalOpen] = useState(false);
+  const [editingPet, setEditingPet] = useState<Paciente | null>(null);
+  const [pacienteForm, setPetForm] = useState<PacienteFormData>(emptyPetForm);
+  const [pacienteFormErrors, setPetFormErrors] = useState<{
+    name?: string;
+    species?: string;
+    size?: string;
+  }>({});
+  const [savingPet, setSavingPet] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  if (!customer) {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="hidden lg:flex flex-1 items-center justify-center"
+      >
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[#1E62EC]/10">
+            <PawPrint className="h-8 w-8 text-[#1E62EC]" />
+          </div>
+          <h2 className="text-xl font-medium text-[#434A57] dark:text-[#f5f9fc] mb-2">
+            Gestão de Clientes
+          </h2>
+          <p className="text-[#727B8E] dark:text-[#8a94a6] mb-4">
+            Selecione um cliente para ver detalhes
+          </p>
+        </div>
+      </motion.div>
+    );
+  }
+
+  const handleOpenPetModal = (paciente?: Paciente) => {
+    setEditingPet(paciente || null);
+    if (paciente) {
+      setPetForm({
+        name: paciente.name,
+        species: paciente.species,
+        breed: paciente.breed,
+        age: paciente.age,
+        weight: paciente.weight,
+        size: normalizePetSize(paciente.size) ?? "",
+        color: paciente.color,
+        notes: paciente.notes,
+      });
+    } else {
+      setPetForm(emptyPetForm);
+    }
+    setPetModalOpen(true);
+  };
+
+  const handleSavePet = async () => {
+    const errs: { name?: string; species?: string; size?: string } = {};
+    if (!pacienteForm.name.trim()) errs.name = "Nome é obrigatório";
+    if (!pacienteForm.species) errs.species = "Espécie é obrigatória";
+    if (!pacienteForm.size) errs.size = "Porte é obrigatório";
+    if (Object.keys(errs).length > 0) {
+      setPetFormErrors(errs);
+      return;
+    }
+    setPetFormErrors({});
+
+    setSavingPet(true);
+    try {
+      await onSavePet(pacienteForm as Omit<Paciente, "id" | "customerId">, editingPet?.id);
+      setPetModalOpen(false);
+      setPetForm(emptyPetForm);
+      setEditingPet(null);
+    } catch {
+      // The parent already handles user-facing feedback.
+    } finally {
+      setSavingPet(false);
+    }
+  };
+
+  return (
+    <motion.div
+      key={customer.id}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="flex flex-1 flex-col min-h-0"
+    >
+      <div className="p-4 border-b border-[#727B8E]/10 dark:border-[#40485A]">
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            className="lg:hidden flex h-10 w-10 items-center justify-center rounded-full text-[#727B8E] hover:bg-[#F4F6F9] dark:hover:bg-[#212225]"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#1E62EC]/20">
+            <span className="text-sm font-medium text-[#1E62EC]">
+              {getInitials(customer.name)}
+            </span>
+          </div>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-medium text-[#434A57] dark:text-[#f5f9fc]">
+              {customer.name}
+            </h2>
+            <div className="flex items-center gap-3 text-sm text-[#727B8E] dark:text-[#8a94a6]">
+              <span className="flex items-center gap-1">
+                <Phone className="h-3 w-3" />
+                {formatClientPhoneForSidebar(getClientPhoneDisplay(customer))}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onEditCustomer}
+              className="flex h-10 w-10 items-center justify-center rounded-full text-[#727B8E] hover:bg-[#F4F6F9] dark:hover:bg-[#212225]"
+            >
+              <Edit className="h-5 w-5" />
+            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="flex h-10 w-10 items-center justify-center rounded-full text-[#727B8E] hover:bg-[#F4F6F9] dark:hover:bg-[#212225]"
+              >
+                <MoreVertical className="h-5 w-5" />
+              </button>
+              {menuOpen && (
+                <div className="absolute right-0 top-full mt-1 w-48 rounded-lg border border-[#727B8E]/10 dark:border-[#40485A] bg-white dark:bg-[#1A1B1D] shadow-lg z-10">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-[#434A57] dark:text-[#f5f9fc] hover:bg-[#F4F6F9] dark:hover:bg-[#212225]"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      if (customer.conversations[0]?.id) {
+                        onOpenConversation(customer.conversations[0].id);
+                        return;
+                      }
+
+                      onTabChange("conversas");
+                    }}
+                  >
+                    <MessageCircle className="h-4 w-4" />
+                    Abrir conversa
+                  </button>
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-2 px-4 py-2.5 text-sm text-red-500 hover:bg-[#F4F6F9] dark:hover:bg-[#212225]"
+                    onClick={() => {
+                      void onDeleteCustomer(customer.id);
+                      setMenuOpen(false);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Excluir cliente
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 flex flex-col min-h-0">
+        <div className="flex gap-1 mx-4 mt-4 p-1 bg-[#F4F6F9] dark:bg-[#212225] rounded-lg">
+          <button
+            type="button"
+            onClick={() => onTabChange("pacientes")}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "pacientes"
+                ? "bg-white dark:bg-[#1A1B1D] text-[#434A57] dark:text-[#f5f9fc] shadow-sm"
+                : "text-[#727B8E] dark:text-[#8a94a6]"
+            }`}
+          >
+            <PawPrint className="h-4 w-4" />
+            Pacientes ({customer.petsCount})
+          </button>
+          <button
+            type="button"
+            onClick={() => onTabChange("agendamentos")}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "agendamentos"
+                ? "bg-white dark:bg-[#1A1B1D] text-[#434A57] dark:text-[#f5f9fc] shadow-sm"
+                : "text-[#727B8E] dark:text-[#8a94a6]"
+            }`}
+          >
+            <Calendar className="h-4 w-4" />
+            Agendamentos
+          </button>
+          <button
+            type="button"
+            onClick={() => onTabChange("conversas")}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "conversas"
+                ? "bg-white dark:bg-[#1A1B1D] text-[#434A57] dark:text-[#f5f9fc] shadow-sm"
+                : "text-[#727B8E] dark:text-[#8a94a6]"
+            }`}
+          >
+            <MessageCircle className="h-4 w-4" />
+            Conversas
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4">
+          {activeTab === "pacientes" && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-medium text-[#727B8E] dark:text-[#8a94a6]">
+                  Pacientes cadastrados
+                </h3>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleOpenPetModal()}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Novo Paciente
+                </Button>
+              </div>
+              {loadingPets ? (
+                <div className="flex h-32 items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-[#1E62EC]" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {customer.pacientes.map((paciente) => (
+                    <motion.div
+                      key={paciente.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-4 bg-[#F4F6F9]/50 dark:bg-[#212225]/50 rounded-xl border border-[#727B8E]/10 dark:border-[#40485A]"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-full bg-[#1E62EC]/20 flex items-center justify-center text-2xl">
+                            {getSpeciesEmoji(paciente.species)}
+                          </div>
+                          <div>
+                            <p className="font-medium text-[#434A57] dark:text-[#f5f9fc]">
+                              {paciente.name}
+                            </p>
+                            <p className="text-sm text-[#727B8E] dark:text-[#8a94a6]">
+                              {paciente.breed} • {paciente.age} • {paciente.weight} • Porte{" "}
+                              {pacienteSizeAbbrev(paciente.size)}
+                            </p>
+                            {paciente.notes && (
+                              <p className="text-xs text-[#727B8E] dark:text-[#8a94a6] mt-1">
+                                {paciente.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenPetModal(paciente)}
+                            className="flex h-8 w-8 items-center justify-center rounded-full text-[#727B8E] hover:bg-[#F4F6F9] dark:hover:bg-[#212225]"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void onDeletePet(paciente.id)}
+                            className="flex h-8 w-8 items-center justify-center rounded-full text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                  {customer.pacientes.length === 0 && (
+                    <div className="text-center py-8 text-[#727B8E] dark:text-[#8a94a6]">
+                      <PawPrint className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>Nenhum paciente cadastrado</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "agendamentos" && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-sm font-medium text-[#727B8E] dark:text-[#8a94a6]">
+                  Histórico de agendamentos
+                </h3>
+              </div>
+              {loadingAppointments ? (
+                <div className="flex h-32 items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-[#1E62EC]" />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {customer.appointments.map((apt) => (
+                    <motion.div
+                      key={apt.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="p-4 bg-[#F4F6F9]/50 dark:bg-[#212225]/50 rounded-xl border border-[#727B8E]/10 dark:border-[#40485A]"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-[#1E62EC]/20 flex items-center justify-center">
+                            <Calendar className="w-5 h-5 text-[#1E62EC]" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-[#434A57] dark:text-[#f5f9fc]">
+                              {apt.service}
+                            </p>
+                            <p className="text-sm text-[#727B8E] dark:text-[#8a94a6]">
+                              {apt.pacienteName} • {apt.date} às{" "}
+                              {apt.timeEnd
+                                ? `${apt.time} – ${apt.timeEnd}`
+                                : apt.time}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`text-xs font-medium px-2 py-1 rounded-full border ${getStatusBadgeStyle(apt.status)}`}
+                          >
+                            {apt.status}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => void onDeleteAppointment(apt.id)}
+                            disabled={deletingAppointmentId === apt.id}
+                            className="flex h-8 w-8 items-center justify-center rounded-full text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:pointer-events-none disabled:opacity-60"
+                          >
+                            {deletingAppointmentId === apt.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                  {customer.appointments.length === 0 && (
+                    <div className="text-center py-8 text-[#727B8E] dark:text-[#8a94a6]">
+                      <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>Nenhum agendamento registrado</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === "conversas" &&
+            (loadingConversations ? (
+              <div className="flex h-32 items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-[#1E62EC]" />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {customer.conversations.map((conv) => (
+                  <motion.button
+                    key={conv.id}
+                    type="button"
+                    onClick={() => onOpenConversation(conv.id)}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    className="w-full p-4 bg-[#F4F6F9]/50 dark:bg-[#212225]/50 rounded-xl border border-[#727B8E]/10 dark:border-[#40485A] cursor-pointer hover:bg-[#F4F6F9] dark:hover:bg-[#212225] transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-[#F4F6F9] dark:bg-[#212225] flex items-center justify-center">
+                        {getChannelIcon(conv.channel)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium text-[#434A57] dark:text-[#f5f9fc] capitalize">
+                            {conv.channel}
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-[#1E62EC]/10 px-2 py-0.5 text-[11px] font-medium text-[#1E62EC] dark:bg-[#2172e5]/20 dark:text-[#7fb0ff]">
+                              {conv.messageCount} mensagem
+                              {conv.messageCount !== 1 ? "ens" : ""}
+                            </span>
+                            <span className="text-xs text-[#727B8E] dark:text-[#8a94a6]">
+                              {conv.date}
+                            </span>
+                          </div>
+                        </div>
+                        <p className="text-sm text-[#727B8E] dark:text-[#8a94a6] truncate mt-1">
+                          {conv.preview}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.button>
+                ))}
+                {customer.conversations.length === 0 && (
+                  <div className="text-center py-8 text-[#727B8E] dark:text-[#8a94a6]">
+                    <MessageCircle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>Nenhuma conversa registrada</p>
+                  </div>
+                )}
+              </div>
+            ))}
+        </div>
+      </div>
+
+      <Modal
+        isOpen={pacienteModalOpen}
+        onClose={() => {
+          setPetModalOpen(false);
+          setPetForm(emptyPetForm);
+          setPetFormErrors({});
+          setEditingPet(null);
+        }}
+        title={editingPet ? "Editar paciente" : "Novo paciente"}
+        onSubmit={() => void handleSavePet()}
+        submitText="Salvar"
+        isLoading={savingPet}
+        className="max-w-[400px] max-h-[85vh] flex flex-col overflow-hidden"
+      >
+        <div className="flex flex-col gap-4 overflow-y-auto max-h-[320px]">
+          <div>
+            <Input
+              label="Nome do paciente *"
+              placeholder="Nome"
+              value={pacienteForm.name}
+              onChange={(e) => {
+                setPetForm((prev) => ({ ...prev, name: e.target.value }));
+                if (e.target.value) setPetFormErrors((prev) => ({ ...prev, name: undefined }));
+              }}
+            />
+            {pacienteFormErrors.name && (
+              <p className="mt-1 text-xs text-red-500">{pacienteFormErrors.name}</p>
+            )}
+          </div>
+          <div>
+            <Select
+              label="Espécie *"
+              value={pacienteForm.species}
+              onChange={(e) => {
+                setPetForm((prev) => ({ ...prev, species: e.target.value }));
+                if (e.target.value) setPetFormErrors((prev) => ({ ...prev, species: undefined }));
+              }}
+              options={[
+                { value: "cachorro", label: "Cachorro" },
+                { value: "gato", label: "Gato" },
+                { value: "ave", label: "Ave" },
+                { value: "roedor", label: "Roedor" },
+                { value: "outro", label: "Outro" },
+              ]}
+            />
+            {pacienteFormErrors.species && (
+              <p className="mt-1 text-xs text-red-500">{pacienteFormErrors.species}</p>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="Raça"
+              placeholder="Raça"
+              value={pacienteForm.breed}
+              onChange={(e) =>
+                setPetForm((prev) => ({ ...prev, breed: e.target.value }))
+              }
+            />
+            <Input
+              label="Idade"
+              placeholder="Idade"
+              value={pacienteForm.age}
+              onChange={(e) =>
+                setPetForm((prev) => ({ ...prev, age: e.target.value }))
+              }
+            />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              label="Peso"
+              placeholder="Peso"
+              value={pacienteForm.weight}
+              onChange={(e) =>
+                setPetForm((prev) => ({ ...prev, weight: e.target.value }))
+              }
+            />
+            <div>
+              <Select
+                label="Porte *"
+                value={pacienteForm.size}
+                onChange={(e) => {
+                  setPetForm((prev) => ({ ...prev, size: e.target.value }));
+                  if (e.target.value) setPetFormErrors((prev) => ({ ...prev, size: undefined }));
+                }}
+                options={[...PACIENTE_SIZE_OPTIONS]}
+              />
+              {pacienteFormErrors.size && (
+                <p className="mt-1 text-xs text-red-500">{pacienteFormErrors.size}</p>
+              )}
+            </div>
+          </div>
+          <Input
+            label="Cor/Pelagem"
+            placeholder="Cor"
+            value={pacienteForm.color}
+            onChange={(e) =>
+              setPetForm((prev) => ({ ...prev, color: e.target.value }))
+            }
+          />
+          <TextAreaField
+            id="paciente-notes"
+            label="Observações"
+            placeholder="Observações"
+            value={pacienteForm.notes}
+            onChange={(e) =>
+              setPetForm((prev) => ({ ...prev, notes: e.target.value }))
+            }
+            rows={3}
+          />
+        </div>
+      </Modal>
+
+    </motion.div>
+  );
+}
+
+const emptyCustomerForm = {
+  name: "",
+  email: "",
+  phone: "",
+  status: "ativo" as "ativo" | "inativo",
+  address: "",
+  notes: "",
+};
+
+type ApiClient = Client & {
+  isActive?: boolean;
+  totalAppointments?: number | null;
+  totalPets?: number | null;
+  totalConversations?: number | null;
+};
+
+type ApiPet = PacienteType & {
+  birthDate?: string | null;
+  birth_date?: string | null;
+  weightKg?: number | string | null;
+  weight_kg?: number | string | null;
+  notes?: string | null;
+  isActive?: boolean | null;
+  is_active?: boolean | null;
+};
+
+type ApiPetAppointment = ApiAppointment & {
+  paciente_id?: string | null;
+};
+
+
+function formatPetAge(paciente: ApiPet): string {
+  if (paciente.age !== undefined && paciente.age !== null) {
+    return String(paciente.age);
+  }
+
+  const birthDate = paciente.birthDate ?? paciente.birth_date;
+  if (!birthDate) return "";
+
+  const birthday = new Date(birthDate);
+  if (Number.isNaN(birthday.getTime())) return "";
+
+  const today = new Date();
+  let age = today.getFullYear() - birthday.getFullYear();
+  const monthDelta = today.getMonth() - birthday.getMonth();
+  if (
+    monthDelta < 0 ||
+    (monthDelta === 0 && today.getDate() < birthday.getDate())
+  ) {
+    age -= 1;
+  }
+
+  return age >= 0 ? String(age) : "";
+}
+
+function formatPetWeight(paciente: ApiPet): string {
+  const value = paciente.weight ?? paciente.weightKg ?? paciente.weight_kg;
+  if (value === undefined || value === null) {
+    return "";
+  }
+  if (String(value).trim() === "") {
+    return "";
+  }
+
+  return String(value);
+}
+
+function getPetNotes(paciente: ApiPet): string {
+  if (typeof paciente.notes === "string" && paciente.notes.trim()) {
+    return paciente.notes.trim();
+  }
+
+  if (typeof paciente.medical_info === "string" && paciente.medical_info.trim()) {
+    return paciente.medical_info.trim();
+  }
+
+  if (paciente.medical_info && typeof paciente.medical_info === "object") {
+    const medicalInfo = paciente.medical_info as {
+      conditions?: string[];
+      medications?: string[];
+      allergies?: string[];
+      notes?: string;
+    };
+
+    if (typeof medicalInfo.notes === "string" && medicalInfo.notes.trim()) {
+      return medicalInfo.notes.trim();
+    }
+
+    const values = [
+      ...(medicalInfo.conditions ?? []),
+      ...(medicalInfo.medications ?? []),
+      ...(medicalInfo.allergies ?? []),
+    ]
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    if (values.length > 0) {
+      return values.join(", ");
+    }
+  }
+
+  return "";
+}
+
+function mapPetFromApi(paciente: ApiPet, customerId: string): Paciente {
+  return {
+    id: paciente.id,
+    customerId,
+    name: paciente.name,
+    species: (paciente.species as Paciente["species"]) || "outro",
+    breed: paciente.breed || "",
+    age: formatPetAge(paciente),
+    weight: formatPetWeight(paciente),
+    size: normalizePetSize(paciente.size) ?? paciente.size ?? "",
+    color: paciente.color || "",
+    notes: getPetNotes(paciente),
+  };
+}
+
+function normalizeAppointmentStatus(
+  status?: string | null,
+): Appointment["status"] {
+  return appointmentStatusFromApi(status);
+}
+
+function mapAppointmentFromApi(
+  appointment: ApiPetAppointment,
+  customerId: string,
+): Appointment {
+  const scheduledDate = new Date(appointment.scheduled_at);
+  const dateStr = scheduledDate.toLocaleDateString("pt-BR");
+  const timeStr = scheduledDate.toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return {
+    id: appointment.id,
+    customerId,
+    pacienteId: appointment.paciente_id || "",
+    scheduleId:
+      appointment.schedule_id !== undefined && appointment.schedule_id !== null
+        ? String(appointment.schedule_id)
+        : undefined,
+    pacienteName: appointment.paciente_name || "",
+    date: dateStr,
+    time: timeStr,
+    service: appointment.specialty || "",
+    status: normalizeAppointmentStatus(appointment.status),
+    notes: appointment.notes || "",
+    pairedAppointmentId:
+      extractPairedAppointmentId(appointment.notes) ?? undefined,
+  };
+}
+
+function ageToBirthDate(ageValue: string): string | undefined {
+  const age = parseInt(ageValue, 10);
+  if (!Number.isFinite(age) || age < 0) {
+    return undefined;
+  }
+
+  const today = new Date();
+  return new Date(
+    today.getFullYear() - age,
+    today.getMonth(),
+    today.getDate(),
+  ).toISOString();
+}
+
+function parseWeightKg(weightValue: string): number | undefined {
+  const normalized = weightValue.replace(",", ".").trim();
+  if (!normalized) return undefined;
+
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function clientToCustomer(c: ApiClient): Customer {
+  const phoneDisplay = formatPhoneForDisplay(c.phone ?? "");
+  const isActive = c.is_active ?? c.isActive ?? true;
+  const petsCount = c.total_pets ?? c.totalPets ?? 0;
+
+  return {
+    id: c.id,
+    name: c.name ?? "",
+    email: c.email ?? "",
+    phone: phoneDisplay,
+    manualPhone: c.manualPhone ?? undefined,
+    status: isActive ? "ativo" : "inativo",
+    address: undefined,
+    notes: c.notes ?? undefined,
+    petsCount,
+    totalAppointments: c.total_appointments ?? c.totalAppointments ?? 0,
+    lastVisit: "",
+    pacientes: [],
+    appointments: [],
+    conversations: [],
+  };
+}
+
+function buildNotes(addressStr: string, notes: string): string {
+  const parts: string[] = [];
+  if (addressStr.trim()) parts.push("Endereço: " + addressStr.trim());
+  if (notes.trim()) parts.push(notes.trim());
+  return parts.join("\n");
+}
+
+function parseNotesForEdit(notes?: string | null): {
+  address: string;
+  notes: string;
+} {
+  if (!notes?.trim()) return { address: "", notes: "" };
+  const firstLine = notes.split("\n")[0]?.trim() ?? "";
+  if (firstLine.startsWith("Endereço:")) {
+    const address = firstLine.replace(/^Endereço:\s*/i, "").trim();
+    const rest = notes.split("\n").slice(1).join("\n").trim();
+    return { address, notes: rest };
+  }
+  return { address: "", notes: notes.trim() };
+}
+
+export default function ClientesPage() {
+  const navigate = useNavigate();
+  const { user } = useAuthContext();
+  const toast = useToast();
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customersLoading, setCustomersLoading] = useState(true);
+  const [customersError, setCustomersError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingAppointmentId, setDeletingAppointmentId] = useState<
+    string | null
+  >(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [customerForm, setCustomerForm] = useState(emptyCustomerForm);
+  const [customerStep, setCustomerStep] = useState<1 | 2>(1);
+  const {
+    address,
+    setField,
+    handleCepChange,
+    cepLoading,
+    cepError,
+    reset: resetAddress,
+  } = useAddressByCep();
+
+  const [customerStep1Errors, setCustomerStep1Errors] = useState<{
+    name?: string;
+    phone?: string;
+  }>({});
+
+  const goToCustomerAddressStep = useCallback(() => {
+    const nameTrim = customerForm.name.trim();
+    const digits = customerForm.phone.replace(/\D/g, "");
+    const localDigits =
+      digits.startsWith("55") && digits.length > 11 ? digits.slice(2) : digits;
+    const editing = Boolean(editingCustomer);
+    const next: { name?: string; phone?: string } = {};
+    if (!nameTrim) next.name = "Informe o nome do tutor.";
+    if (!editing && localDigits.length < 10) {
+      next.phone = "Informe DDD + número (mín. 10 dígitos).";
+    }
+    setCustomerStep1Errors(next);
+    if (Object.keys(next).length > 0) return;
+    setCustomerStep(2);
+  }, [customerForm.name, customerForm.phone, editingCustomer]);
+
+  const [loadingPets, setLoadingPets] = useState(false);
+  const [loadingAppointments, setLoadingAppointments] = useState(false);
+  const [loadingConversations, setLoadingConversations] = useState(false);
+  const [activeTab, setActiveTab] = useState<
+    "pacientes" | "agendamentos" | "conversas"
+  >("pacientes");
+  const [loadedTabs, setLoadedTabs] = useState<Record<string, Set<string>>>({});
+
+  const selectedCustomer = customers.find((c) => c.id === selectedId) ?? null;
+
+  useEffect(() => {
+    let cancelled = false;
+    setCustomersLoading(true);
+    setCustomersError(null);
+    clientService
+      .listClients({ limit: 500 })
+      .then((list) => {
+        if (!cancelled) setCustomers(list.map(clientToCustomer));
+      })
+      .catch((err: any) => {
+        if (!cancelled)
+          setCustomersError(
+            err.response?.data?.detail ?? "Erro ao carregar clientes.",
+          );
+      })
+      .finally(() => {
+        if (!cancelled) setCustomersLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (customerModalOpen) {
+      setSaveError(null);
+      setCustomerStep1Errors({});
+      setCustomerStep(1);
+      if (editingCustomer) {
+        const { address: addrLine, notes: notesOnly } = parseNotesForEdit(
+          editingCustomer.notes,
+        );
+        setCustomerForm({
+          name: editingCustomer.name,
+          email: editingCustomer.email,
+          // Campo "manual" para visualizacao. O `phone` (mensagens) permanece intacto no backend.
+          phone: editingCustomer.manualPhone ?? "",
+          status: editingCustomer.status,
+          address: addrLine,
+          notes: notesOnly,
+        });
+        resetAddress({ rua: addrLine });
+      } else {
+        setCustomerForm(emptyCustomerForm);
+        resetAddress();
+      }
+    }
+  }, [customerModalOpen, editingCustomer, resetAddress]);
+
+  const loadPets = useCallback(
+    async (customerId: string) => {
+      const alreadyLoaded = loadedTabs[customerId]?.has("pacientes");
+      if (alreadyLoaded) return;
+
+      setLoadingPets(true);
+      try {
+        const pacientes = await clientService.getClientPets(
+          customerId,
+          user?.petshop_id,
+        );
+        const mappedPets = pacientes.map((paciente) =>
+          mapPetFromApi(paciente as ApiPet, customerId),
+        );
+        setCustomers((prev) =>
+          prev.map((c) =>
+            c.id === customerId
+              ? { ...c, pacientes: mappedPets, petsCount: mappedPets.length }
+              : c,
+          ),
+        );
+        setLoadedTabs((prev) => ({
+          ...prev,
+          [customerId]: new Set([...(prev[customerId] || []), "pacientes"]),
+        }));
+      } catch (error) {
+        console.error("Erro ao carregar pacientes:", error);
+      } finally {
+        setLoadingPets(false);
+      }
+    },
+    [user?.petshop_id, loadedTabs],
+  );
+
+  const loadConversations = useCallback(
+    async (customerId: string) => {
+      const alreadyLoaded = loadedTabs[customerId]?.has("conversas");
+      if (alreadyLoaded) return;
+
+      setLoadingConversations(true);
+      try {
+        const result = await clientService.getClientConversations(customerId);
+        const mappedConversations: ConversationHistory[] =
+          result.conversations.map((conv) => ({
+            id: conv.conversation_id,
+            date: new Date(conv.last_message_at).toLocaleDateString("pt-BR"),
+            preview:
+              conv.message_count > 0
+                ? `${conv.message_count} mensagens registradas`
+                : "Sem mensagens registradas",
+            messageCount: conv.message_count,
+            channel: "whatsapp" as const,
+          }));
+        setCustomers((prev) =>
+          prev.map((c) =>
+            c.id === customerId
+              ? { ...c, conversations: mappedConversations }
+              : c,
+          ),
+        );
+        setLoadedTabs((prev) => ({
+          ...prev,
+          [customerId]: new Set([...(prev[customerId] || []), "conversas"]),
+        }));
+      } catch (error) {
+        console.error("Erro ao carregar conversas:", error);
+      } finally {
+        setLoadingConversations(false);
+      }
+    },
+    [loadedTabs],
+  );
+
+  const loadAppointments = useCallback(
+    async (customerId: string) => {
+      const alreadyLoaded = loadedTabs[customerId]?.has("agendamentos");
+      if (alreadyLoaded) return;
+
+      setLoadingAppointments(true);
+      try {
+        const appointments = await appointmentService.listAppointments({
+          client_id: customerId,
+        });
+        const mappedAppointments = appointments.map((appointment) =>
+          mapAppointmentFromApi(appointment as ApiPetAppointment, customerId),
+        );
+        const mergedAppointments = mergePairedByTime(
+          mappedAppointments,
+          (first, second) => ({
+            ...first,
+            pairedAppointmentId: second.id,
+            timeEnd: second.time,
+          }),
+        );
+        setCustomers((prev) =>
+          prev.map((c) =>
+            c.id === customerId
+              ? { ...c, appointments: mergedAppointments }
+              : c,
+          ),
+        );
+        setLoadedTabs((prev) => ({
+          ...prev,
+          [customerId]: new Set([...(prev[customerId] || []), "agendamentos"]),
+        }));
+      } catch (error) {
+        console.error("Erro ao carregar agendamentos:", error);
+      } finally {
+        setLoadingAppointments(false);
+      }
+    },
+    [loadedTabs],
+  );
+
+  const handleTabChange = useCallback(
+    (tab: "pacientes" | "agendamentos" | "conversas") => {
+      setActiveTab(tab);
+      if (!selectedId) return;
+
+      const customer = customers.find((c) => c.id === selectedId);
+      if (!customer) return;
+
+      if (tab === "pacientes") {
+        loadPets(selectedId);
+      } else if (tab === "agendamentos") {
+        loadAppointments(selectedId);
+      } else if (tab === "conversas") {
+        loadConversations(selectedId);
+      }
+    },
+    [selectedId, customers, loadPets, loadAppointments, loadConversations],
+  );
+
+  useEffect(() => {
+    if (!selectedId) return;
+
+    if (activeTab === "pacientes") {
+      loadPets(selectedId);
+      return;
+    }
+
+    if (activeTab === "agendamentos") {
+      loadAppointments(selectedId);
+      return;
+    }
+
+    loadConversations(selectedId);
+  }, [selectedId, activeTab, loadPets, loadAppointments, loadConversations]);
+
+  const handleDeleteCustomer = async (customerId: string) => {
+    const customer = customers.find((item) => item.id === customerId);
+
+    try {
+      await clientService.deleteClient(customerId);
+      setCustomers((prev) => prev.filter((c) => c.id !== customerId));
+      if (selectedId === customerId) {
+        setSelectedId(null);
+      }
+      toast.success(
+        "Cliente removido",
+        customer?.name
+          ? `${customer.name} foi excluído com sucesso.`
+          : "O cliente foi excluído com sucesso.",
+      );
+    } catch (error: any) {
+      console.error("Erro ao excluir cliente:", error);
+      toast.error(
+        "Erro ao excluir cliente",
+        error.response?.data?.detail ||
+          error.response?.data?.error ||
+          "Não foi possível excluir o cliente.",
+      );
+    }
+  };
+
+  const handleDeletePet = async (pacienteId: string) => {
+    if (!selectedCustomer) return;
+
+    const paciente = selectedCustomer.pacientes.find((item) => item.id === pacienteId);
+
+    try {
+      await pacienteService.deletePet(pacienteId);
+      setCustomers((prev) =>
+        prev.map((c) =>
+          c.id === selectedCustomer.id
+            ? {
+                ...c,
+                pacientes: c.pacientes.filter((p) => p.id !== pacienteId),
+                petsCount: Math.max(c.petsCount - 1, 0),
+              }
+            : c,
+        ),
+      );
+      toast.success(
+        "Paciente removido",
+        paciente?.name
+          ? `${paciente.name} foi removido com sucesso.`
+          : "O paciente foi removido com sucesso.",
+      );
+    } catch (error: any) {
+      console.error("Erro ao excluir paciente:", error);
+      toast.error(
+        "Erro ao excluir paciente",
+        error.response?.data?.detail ||
+          error.response?.data?.error ||
+          "Não foi possível excluir o paciente.",
+      );
+    }
+  };
+
+  const handleDeleteAppointment = async (appointmentId: string) => {
+    if (!selectedCustomer) return;
+
+    const appointment = selectedCustomer.appointments.find(
+      (item) => item.id === appointmentId,
+    );
+
+    if (!appointment) return;
+
+    if (deletingAppointmentId === appointmentId) return;
+    setDeletingAppointmentId(appointmentId);
+
+    const removeIds = idsForMergedDisplayRow(appointment);
+
+    if (appointmentId.startsWith("apt-")) {
+      try {
+        setCustomers((prev) =>
+          prev.map((c) =>
+            c.id === selectedCustomer.id
+              ? {
+                  ...c,
+                  appointments: c.appointments.filter(
+                    (a) => !removeIds.includes(a.id),
+                  ),
+                  totalAppointments: Math.max(
+                    c.totalAppointments - removeIds.length,
+                    0,
+                  ),
+                }
+              : c,
+          ),
+        );
+        toast.info(
+          "Agendamento removido",
+          "O registro local foi removido da visualização do cliente.",
+        );
+      } finally {
+        setDeletingAppointmentId(null);
+      }
+      return;
+    }
+
+    try {
+      await appointmentService.deleteAppointment(appointmentId);
+      setCustomers((prev) =>
+        prev.map((c) =>
+          c.id === selectedCustomer.id
+            ? {
+                ...c,
+                appointments: c.appointments.filter(
+                  (a) => !removeIds.includes(a.id),
+                ),
+                totalAppointments: Math.max(
+                  c.totalAppointments - removeIds.length,
+                  0,
+                ),
+              }
+            : c,
+        ),
+      );
+      toast.success(
+        "Agendamento removido",
+        appointment.service
+          ? `${appointment.service} foi removido com sucesso.`
+          : "O agendamento foi removido com sucesso.",
+      );
+    } catch (error: any) {
+      console.error("Erro ao cancelar agendamento:", error);
+      toast.error(
+        "Erro ao remover agendamento",
+        error.response?.data?.detail ||
+          error.response?.data?.error ||
+          "Não foi possível remover o agendamento.",
+      );
+    } finally {
+      setDeletingAppointmentId(null);
+    }
+  };
+
+  const handleSavePet = useCallback(
+    async (pacienteData: Omit<Paciente, "id" | "customerId">, pacienteId?: string) => {
+      if (!selectedCustomer) return;
+
+      try {
+        if (pacienteId) {
+          const updated = await pacienteService.updatePet(pacienteId, {
+            name: pacienteData.name,
+            species: pacienteData.species,
+            breed: pacienteData.breed || undefined,
+            birthDate: ageToBirthDate(pacienteData.age),
+            weightKg: parseWeightKg(pacienteData.weight),
+            size: normalizePetSize(pacienteData.size),
+            color: pacienteData.color || undefined,
+            notes: pacienteData.notes || undefined,
+          });
+          setCustomers((prev) =>
+            prev.map((c) => {
+              if (c.id !== selectedCustomer.id) return c;
+              return {
+                ...c,
+                pacientes: c.pacientes.map((p) =>
+                  p.id === pacienteId
+                    ? mapPetFromApi(updated as ApiPet, selectedCustomer.id)
+                    : p,
+                ),
+              };
+            }),
+          );
+          toast.success(
+            "Paciente atualizado",
+            pacienteData.name
+              ? `${pacienteData.name} foi atualizado com sucesso.`
+              : "O paciente foi atualizado com sucesso.",
+          );
+        } else {
+          const created = await pacienteService.createPet({
+            petshop_id: user?.petshop_id || 1,
+            client_id: selectedCustomer.id,
+            name: pacienteData.name,
+            species: pacienteData.species,
+            breed: pacienteData.breed || undefined,
+            birthDate: ageToBirthDate(pacienteData.age),
+            weightKg: parseWeightKg(pacienteData.weight),
+            size: normalizePetSize(pacienteData.size),
+            color: pacienteData.color || undefined,
+            notes: pacienteData.notes || undefined,
+          });
+          const newPet = mapPetFromApi(created as ApiPet, selectedCustomer.id);
+          setCustomers((prev) =>
+            prev.map((c) => {
+              if (c.id !== selectedCustomer.id) return c;
+              return {
+                ...c,
+                petsCount: c.petsCount + 1,
+                pacientes: [...c.pacientes, newPet],
+              };
+            }),
+          );
+          toast.success(
+            "Paciente cadastrado",
+            pacienteData.name
+              ? `${pacienteData.name} foi cadastrado com sucesso.`
+              : "O paciente foi cadastrado com sucesso.",
+          );
+        }
+      } catch (error: any) {
+        console.error("Erro ao salvar paciente:", error);
+        toast.error(
+          "Erro ao salvar paciente",
+          error.response?.data?.detail ||
+            error.response?.data?.error ||
+            "Não foi possível salvar o paciente.",
+        );
+        throw error;
+      }
+    },
+    [selectedCustomer, toast, user],
+  );
+
+  const handleOpenConversation = useCallback(
+    (conversationId: string) => {
+      navigate(`/chat?id=${encodeURIComponent(conversationId)}`);
+    },
+    [navigate],
+  );
+
+  const handleSaveCustomer = useCallback(async () => {
+    const { name, email, phone, status, notes } = customerForm;
+    const phoneValue = phone.trim();
+    const editing = Boolean(editingCustomer);
+
+    if (!name.trim()) return;
+    // Na criacao, `phone` continua obrigatorio (backend exige).
+    if (!editing && !phoneValue) return;
+
+    const addr = address;
+    const addressStr = [
+      addr.rua,
+      addr.numero,
+      addr.complemento,
+      addr.bairro,
+      addr.cidade,
+      addr.uf,
+    ]
+      .filter(Boolean)
+      .join(", ")
+      .trim();
+    const notesValue = buildNotes(addressStr, notes);
+
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      if (editingCustomer) {
+        // Atualiza somente o numero "manual" de visualizacao.
+        // O campo `phone` (usado pela logica de envio/recepcao) permanece intacto.
+        const updated = await clientService.updateClient(editingCustomer.id, {
+          ...(phoneValue ? { manualPhone: phoneValue } : {}),
+          name: name.trim(),
+          email: email.trim() || undefined,
+          is_active: status === "ativo",
+          notes: notesValue || undefined,
+        });
+        setCustomers((prev) =>
+          prev.map((c) =>
+            c.id === editingCustomer.id ? clientToCustomer(updated) : c,
+          ),
+        );
+        setCustomerModalOpen(false);
+        toast.success(
+          "Cliente atualizado",
+          `${name.trim()} foi atualizado com sucesso.`,
+        );
+      } else {
+        const newClient = await clientService.createClient({
+          phone: phoneValue,
+          manualPhone: phoneValue,
+          name: name.trim(),
+          email: email.trim() || undefined,
+          source: "manual",
+        });
+        if (notesValue) {
+          await clientService.updateClient(newClient.id, { notes: notesValue });
+        }
+        const withNotes = notesValue
+          ? { ...newClient, notes: notesValue }
+          : newClient;
+        setCustomers((prev) => [clientToCustomer(withNotes), ...prev]);
+        setSelectedId(newClient.id);
+        setCustomerModalOpen(false);
+        toast.success(
+          "Cliente cadastrado",
+          `${name.trim()} foi cadastrado com sucesso.`,
+        );
+      }
+    } catch (err: any) {
+      const message =
+        err.response?.data?.detail ||
+        err.response?.data?.error ||
+        "Erro ao salvar cliente.";
+      setSaveError(message);
+      toast.error("Erro ao salvar cliente", message);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [customerForm, editingCustomer, address, toast]);
+
+  return (
+    <DashboardLayout
+      sidebar={
+        <ClientsSidebar
+          customers={customers}
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onNewCustomer={() => {
+            setEditingCustomer(null);
+            setCustomerModalOpen(true);
+          }}
+          loading={customersLoading}
+          error={customersError}
+        />
+      }
+    >
+      <AnimatePresence mode="wait">
+        <CustomerDetails
+          customer={selectedCustomer}
+          onBack={() => setSelectedId(null)}
+          onEditCustomer={() => {
+            setEditingCustomer(selectedCustomer);
+            setCustomerModalOpen(true);
+          }}
+          onDeleteCustomer={handleDeleteCustomer}
+          onDeletePet={handleDeletePet}
+          onDeleteAppointment={handleDeleteAppointment}
+          deletingAppointmentId={deletingAppointmentId}
+          onSavePet={handleSavePet}
+          onOpenConversation={handleOpenConversation}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          loadingPets={loadingPets}
+          loadingAppointments={loadingAppointments}
+          loadingConversations={loadingConversations}
+        />
+      </AnimatePresence>
+
+      <Modal
+        isOpen={customerModalOpen}
+        onClose={() =>
+          customerStep === 2 ? setCustomerStep(1) : setCustomerModalOpen(false)
+        }
+        title={editingCustomer ? "Editar cliente" : "Novo cliente"}
+        onSubmit={
+          customerStep === 1
+            ? () => goToCustomerAddressStep()
+            : () => void handleSaveCustomer()
+        }
+        submitText={
+          customerStep === 1
+            ? "Próximo"
+            : editingCustomer
+              ? "Salvar"
+              : "Cadastrar"
+        }
+        cancelText={customerStep === 2 ? "Voltar" : "Cancelar"}
+        isLoading={isSaving && customerStep === 2}
+        className="max-w-[400px] max-h-[85vh] flex flex-col overflow-hidden"
+      >
+        <div className="flex flex-col gap-4 overflow-y-auto max-h-[320px]">
+          {saveError && (
+            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-600 dark:text-red-400">
+              {saveError}
+            </p>
+          )}
+          <div className="flex gap-1" aria-label={`Etapa ${customerStep} de 2`}>
+            {[1, 2].map((step) => (
+              <div
+                key={step}
+                className={cn(
+                  "h-1 flex-1 rounded-full transition-colors",
+                  step <= customerStep
+                    ? "bg-[#1E62EC] dark:bg-[#2172e5]"
+                    : "bg-[#727B8E]/25 dark:bg-[#40485A]",
+                )}
+              />
+            ))}
+          </div>
+
+          {customerStep === 1 && (
+            <>
+              <div>
+                <Input
+                  label="Nome"
+                  placeholder="Nome do tutor"
+                  value={customerForm.name}
+                  onChange={(e) => {
+                    setCustomerForm((f) => ({ ...f, name: e.target.value }));
+                    if (e.target.value.trim())
+                      setCustomerStep1Errors((prev) => ({
+                        ...prev,
+                        name: undefined,
+                      }));
+                  }}
+                  required
+                />
+                {customerStep1Errors.name && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {customerStep1Errors.name}
+                  </p>
+                )}
+              </div>
+              <div>
+                <Input
+                  label="Telefone"
+                  placeholder="(11) 99999-9999"
+                  value={customerForm.phone}
+                  onChange={(e) => {
+                    setCustomerForm((f) => ({
+                      ...f,
+                      // Evita letras (ex.: colar texto) no valor do telefone.
+                      // Mantemos '@' caso venha um identificador especial.
+                      phone: maskPhone(e.target.value.replace(/[a-z]/gi, "")),
+                    }));
+                    setCustomerStep1Errors((prev) => ({
+                      ...prev,
+                      phone: undefined,
+                    }));
+                  }}
+                  required={!editingCustomer}
+                />
+                {customerStep1Errors.phone && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {customerStep1Errors.phone}
+                  </p>
+                )}
+              </div>
+              <Input
+                label="E-mail"
+                type="email"
+                placeholder="email@exemplo.com (opcional)"
+                value={customerForm.email}
+                onChange={(e) =>
+                  setCustomerForm((f) => ({ ...f, email: e.target.value }))
+                }
+              />
+            </>
+          )}
+
+          {customerStep === 2 && (
+            <div className="flex flex-col gap-4">
+              <div className="relative">
+                <Input
+                  label="CEP"
+                  placeholder="00000-000"
+                  value={address.cep}
+                  onChange={handleCepChange}
+                />
+                {cepLoading && (
+                  <div className="absolute right-3 top-9">
+                    <Loader2 className="h-4 w-4 animate-spin text-[#1E62EC]" />
+                  </div>
+                )}
+                {cepError && (
+                  <p className="mt-1 text-xs text-red-500">{cepError}</p>
+                )}
+              </div>
+              <Input
+                label="Rua"
+                placeholder="Logradouro"
+                value={address.rua}
+                onChange={(e) => setField("rua", e.target.value)}
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Número"
+                  placeholder="Nº"
+                  value={address.numero}
+                  onChange={(e) => setField("numero", e.target.value)}
+                />
+                <Input
+                  label="Complemento"
+                  placeholder="Apto, sala..."
+                  value={address.complemento}
+                  onChange={(e) => setField("complemento", e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Bairro"
+                  placeholder="Bairro"
+                  value={address.bairro}
+                  onChange={(e) => setField("bairro", e.target.value)}
+                />
+                <Input
+                  label="Cidade"
+                  placeholder="Cidade"
+                  value={address.cidade}
+                  onChange={(e) => setField("cidade", e.target.value)}
+                />
+              </div>
+              <Input
+                label="UF"
+                placeholder="UF"
+                value={address.uf}
+                onChange={(e) =>
+                  setField("uf", e.target.value.toUpperCase().slice(0, 2))
+                }
+              />
+              <Select
+                label="Status"
+                placeholder="Selecione"
+                value={customerForm.status}
+                onChange={(e) =>
+                  setCustomerForm((f) => ({
+                    ...f,
+                    status: e.target.value as "ativo" | "inativo",
+                  }))
+                }
+                options={[
+                  { value: "ativo", label: "Ativo" },
+                  { value: "inativo", label: "Inativo" },
+                ]}
+              />
+              <div className="flex flex-col gap-2">
+                <label className="font-be-vietnam-pro text-sm font-semibold text-[#434A57] dark:text-[#f5f9fc]">
+                  Observações
+                </label>
+                <TextArea
+                  placeholder="Observações sobre o cliente"
+                  value={customerForm.notes}
+                  onChange={(e) =>
+                    setCustomerForm((f) => ({ ...f, notes: e.target.value }))
+                  }
+                  rows={2}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </Modal>
+    </DashboardLayout>
+  );
+}

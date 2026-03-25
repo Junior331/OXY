@@ -1,0 +1,195 @@
+import { Request, Response } from 'express'
+import { prisma } from '../../lib/prisma'
+
+// GET /services - List all services
+export async function listServices(req: Request, res: Response) {
+  try {
+    const companyId = req.user!.companyId
+    const { is_active, specialty_id } = req.query
+
+    const where: any = { companyId }
+
+    if (is_active !== undefined) {
+      where.isActive = is_active === 'true'
+    }
+
+    if (specialty_id !== undefined) {
+      where.specialtyId = specialty_id === 'null' ? null : specialty_id
+    }
+
+    const services = await prisma.clinicaService.findMany({
+      where,
+      include: { specialty: { select: { id: true, name: true, color: true } } },
+      orderBy: { name: 'asc' },
+    })
+
+    res.json(services)
+  } catch (error) {
+    console.error('Error listing services:', error)
+    res.status(500).json({ error: 'Failed to list services' })
+  }
+}
+
+// GET /services/:serviceId - Get service details
+export async function getService(req: Request, res: Response) {
+  try {
+    const companyId = req.user!.companyId
+    const serviceId = req.params.serviceId!
+
+    const service = await prisma.clinicaService.findUnique({
+      where: { id: parseInt(serviceId) },
+    })
+
+    if (!service || service.companyId !== companyId) {
+      return res.status(404).json({ error: 'Service not found' })
+    }
+
+    res.json(service)
+  } catch (error) {
+    console.error('Error getting service:', error)
+    res.status(500).json({ error: 'Failed to get service' })
+  }
+}
+
+// POST /services - Create a new service
+export async function createService(req: Request, res: Response) {
+  try {
+    const companyId = req.user!.companyId
+    const { name, description, duration_min, price, price_by_size, duration_multiplier_large, specialty_id, requires_vet } =
+      req.body
+
+    if (!name) {
+      return res.status(400).json({ error: 'name is required' })
+    }
+
+    const service = await prisma.clinicaService.create({
+      data: {
+        companyId,
+        name,
+        description,
+        durationMin: duration_min || 60,
+        price: price ? parseFloat(price) : null,
+        priceBySize: price_by_size,
+        durationMultiplierLarge: duration_multiplier_large ? parseFloat(duration_multiplier_large) : null,
+        specialtyId: specialty_id ?? null,
+        requiresVet: requires_vet ?? false,
+        isActive: true,
+      },
+      include: { specialty: { select: { id: true, name: true, color: true } } },
+    })
+
+    res.status(201).json(service)
+  } catch (error) {
+    console.error('Error creating service:', error)
+    res.status(500).json({ error: 'Failed to create service' })
+  }
+}
+
+// PUT /services/:serviceId - Update service
+export async function updateService(req: Request, res: Response) {
+  try {
+    const companyId = req.user!.companyId
+    const serviceId = req.params.serviceId!
+    const { name, description, duration_min, price, price_by_size, is_active, specialty_id, duration_multiplier_large } = req.body
+
+    const existing = await prisma.clinicaService.findUnique({
+      where: { id: parseInt(serviceId) },
+    })
+
+    if (!existing || existing.companyId !== companyId) {
+      return res.status(404).json({ error: 'Service not found' })
+    }
+
+    const service = await prisma.clinicaService.update({
+      where: { id: parseInt(serviceId) },
+      data: {
+        ...(name !== undefined ? { name } : {}),
+        ...(description !== undefined ? { description } : {}),
+        ...(duration_min !== undefined ? { durationMin: duration_min } : {}),
+        ...(price !== undefined ? { price: price !== null && price !== '' ? parseFloat(String(price)) : null } : {}),
+        ...(price_by_size !== undefined ? { priceBySize: price_by_size } : {}),
+        ...(is_active !== undefined ? { isActive: is_active } : {}),
+        ...(specialty_id !== undefined ? { specialtyId: specialty_id || null } : {}),
+        ...(duration_multiplier_large !== undefined ? { durationMultiplierLarge: duration_multiplier_large !== null ? parseFloat(String(duration_multiplier_large)) : null } : {}),
+      },
+      include: { specialty: { select: { id: true, name: true, color: true } } },
+    })
+
+    res.json(service)
+  } catch (error) {
+    console.error('Error updating service:', error)
+    res.status(500).json({ error: 'Failed to update service' })
+  }
+}
+
+// DELETE /services/:serviceId - Delete service
+export async function deleteService(req: Request, res: Response) {
+  try {
+    const companyId = req.user!.companyId
+    const serviceId = req.params.serviceId!
+
+    const existing = await prisma.clinicaService.findUnique({
+      where: { id: parseInt(serviceId) },
+    })
+
+    if (!existing || existing.companyId !== companyId) {
+      return res.status(404).json({ error: 'Service not found' })
+    }
+
+    await prisma.clinicaService.delete({
+      where: { id: parseInt(serviceId) },
+    })
+
+    res.json({ success: true, message: 'Service deleted' })
+  } catch (error) {
+    console.error('Error deleting service:', error)
+    res.status(500).json({ error: 'Failed to delete service' })
+  }
+}
+
+// GET /services/bookable - Get bookable services (filtrable)
+export async function getBookableServices(req: Request, res: Response) {
+  try {
+    const companyId = req.user!.companyId
+    const { specialty, pacientespecies, pacientesize } = req.query
+
+    const where: any = {
+      companyId,
+      isActive: true,
+    }
+
+    const services = await prisma.clinicaService.findMany({
+      where,
+      orderBy: { name: 'asc' },
+    })
+
+    // Filter based on paciente characteristics if provided
+    let filtered = services
+    if (pacientesize === 'large') {
+      filtered = services.filter((s) => s.durationMultiplierLarge !== null)
+    }
+
+    res.json(filtered)
+  } catch (error) {
+    console.error('Error getting bookable services:', error)
+    res.status(500).json({ error: 'Failed to get bookable services' })
+  }
+}
+
+// GET /professionals/:professionalId/services - Get services by professional
+// Note: This is a placeholder since the schema doesn't have a professional field
+export async function getServicesByProfessional(req: Request, res: Response) {
+  try {
+    const companyId = req.user!.companyId
+
+    const services = await prisma.clinicaService.findMany({
+      where: { companyId },
+      orderBy: { name: 'asc' },
+    })
+
+    res.json(services)
+  } catch (error) {
+    console.error('Error getting services:', error)
+    res.status(500).json({ error: 'Failed to get services' })
+  }
+}

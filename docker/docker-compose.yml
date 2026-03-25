@@ -1,0 +1,81 @@
+services:
+
+  backend:
+    build:
+      context: ../backend/api-node
+      dockerfile: Dockerfile
+    container_name: clinica-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../backend/api-node/src:/app/src
+      - ../backend/api-node/prisma:/app/prisma
+      - ../.env:/app/.env
+      - baileys_sessions:/app/sessions
+    environment:
+      - NODE_ENV=development
+    env_file:
+      - ../.env
+    depends_on:
+      - redis
+    networks:
+      - clinica-network
+
+  ai-service:
+    build:
+      context: ../backend/ai-service
+      dockerfile: Dockerfile
+    container_name: clinica-ai-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend/ai-service:/app
+    env_file:
+      - ../.env
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    depends_on:
+      - redis
+    networks:
+      - clinica-network
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: clinica-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../frontend:/app          # monta tudo do host (hot reload)
+      - /app/node_modules         # anonymous volume: preserva node_modules do container
+    environment:
+      - NODE_ENV=development
+      - VITE_BACKEND_URL=http://backend:3000
+    depends_on:
+      - backend
+    networks:
+      - clinica-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: clinica-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - clinica-network
+volumes:
+  redis_data:
+  baileys_sessions:
+
+networks:
+  clinica-network:
+    driver: bridge
+    name: clinica-network
