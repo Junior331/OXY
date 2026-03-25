@@ -292,9 +292,9 @@ export async function executeTool(name: string, args: any, companyId: number): P
         LIMIT 3
       `
 
-      const petsStr = pacientes?.map(p => `${p.name} (${p.species}, ${p.breed ?? 'Sem raça definida'}, porte ${p.size ?? '?'})`).join(', ') ?? 'nenhum paciente cadastrado'
+      const pacientesStr = pacientes?.map(p => `${p.name} (${p.species}, ${p.breed ?? 'Sem raça definida'}, porte ${p.size ?? '?'})`).join(', ') ?? 'nenhum paciente cadastrado'
       const histStr = lastAppt?.map(a => `${new Date(String(a.scheduled_date) + 'T12:00:00').toLocaleDateString('pt-BR')} — ${a.service_name}`).join('\n  ') ?? 'sem histórico'
-      return `👤 ${client.name}\n📱 ${client.phone}\n🐾 Pacientes: ${petsStr}\n📋 Últimas visitas:\n  ${histStr}`
+      return `👤 ${client.name}\n📱 ${client.phone}\n🐾 Pacientes: ${pacientesStr}\n📋 Últimas visitas:\n  ${histStr}`
     }
 
     case 'get_lodging_availability': {

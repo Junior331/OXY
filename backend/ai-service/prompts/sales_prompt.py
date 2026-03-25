@@ -171,20 +171,20 @@ def build_faq_prompt(context: dict, router_ctx: dict) -> str:
     client_name = client["name"] if client and client.get("name") else None
 
     # Auto-resolve: se o cliente tem apenas 1 paciente, usa ele para preço por porte
-    auto_pet = None
+    auto_paciente = None
     price_key = None
-    auto_pet_size_label = None
+    auto_paciente_size_label = None
     if len(pacientes) == 1:
-        auto_pet = pacientes[0]
-        raw_sz = auto_pet.get("size", "")
+        auto_paciente = pacientes[0]
+        raw_sz = auto_paciente.get("size", "")
         price_key = _normalize_size_for_price_key(raw_sz) if raw_sz else None
-        auto_pet_size_label = _porte_label_pt(price_key)
+        auto_paciente_size_label = _porte_label_pt(price_key)
 
     # Detecta se algum paciente não tem porte (ou se não tem paciente nenhum)
     pacientemissing_size = False
-    if auto_pet and not price_key:
+    if auto_paciente and not price_key:
         pacientemissing_size = True
-    elif not auto_pet and pacientes:
+    elif not auto_paciente and pacientes:
         pacientemissing_size = any(not p.get("size") for p in pacientes)
     elif not pacientes:
         pacientemissing_size = True
@@ -207,7 +207,7 @@ def build_faq_prompt(context: dict, router_ctx: dict) -> str:
             if price_key:
                 val = sz.get(price_key)
                 price = (
-                    f"R${val} (porte {auto_pet_size_label})"
+                    f"R${val} (porte {auto_paciente_size_label})"
                     if val is not None
                     else "consultar (preço por porte)"
                 )
@@ -253,8 +253,8 @@ def build_faq_prompt(context: dict, router_ctx: dict) -> str:
     # Regra de porte obrigatório
     size_rule = ""
     if pacientemissing_size:
-        pets_no_size = [p["name"] for p in pacientes if not p.get("size")]
-        label = f" ({', '.join(pets_no_size)})" if pets_no_size else ""
+        pacientes_no_size = [p["name"] for p in pacientes if not p.get("size")]
+        label = f" ({', '.join(pacientes_no_size)})" if pacientes_no_size else ""
         size_rule = f"""\n⚠️ PORTE NÃO INFORMADO{label} — REGRA OBRIGATÓRIA:
 O preço dos serviços DEPENDE do porte do paciente.
 Você DEVE seguir esta sequência ANTES de mostrar qualquer preço:

@@ -157,7 +157,7 @@ Analise TODO o histórico para extrair o contexto acumulado:
 {{"agent":"onboarding_agent","stage":"WELCOME","active_paciente":null,"service":null,"date_mentioned":null,"awaiting_confirmation":false}}
 
 "quero cadastrar meu cachorro Rex" →
-{{"agent":"onboarding_agent","stage":"PET_REGISTRATION","active_paciente":"Rex","service":null,"date_mentioned":null,"awaiting_confirmation":false}}
+{{"agent":"onboarding_agent","stage":"PATIENT_REGISTRATION","active_paciente":"Rex","service":null,"date_mentioned":null,"awaiting_confirmation":false}}
 
 "quero agendar banho pra sexta" (hoje={today_display}) →
 {{"agent":"booking_agent","stage":"SCHEDULING","active_paciente":null,"service":"Banho","date_mentioned":"{next_friday.isoformat()}","awaiting_confirmation":false}}

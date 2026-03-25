@@ -68,13 +68,13 @@ def build_booking_prompt(context: dict, router_ctx: dict) -> str:
 
     # Pacientes com detalhes (porte sempre legível: P/M/G ou pequeno/médio/grande)
     if pacientes:
-        pets_lines = " | ".join(
+        pacientes_lines = " | ".join(
             f"{p['name']} (id={p['id']}, {p.get('species','?')}, porte {_format_porte_label(p.get('size'))})"
             for p in pacientes
         )
         pacientecount = len(pacientes)
     else:
-        pets_lines = "nenhum"
+        pacientes_lines = "nenhum"
         pacientecount = 0
 
     # Serviços com preço correto por porte — encontra o porte do paciente ativo (normaliza P/M/G → small/medium/large)
@@ -148,7 +148,7 @@ DATA HOJE: {today} ({today_weekday}) — referência absoluta para qualquer cál
 {f"Cliente: {client_name}" if client_name else ""}
 {f"ESTÁGIO CRM: {client_stage}" if client_stage else ""}
 
-Pacientes DO CLIENTE: {pets_lines}
+Pacientes DO CLIENTE: {pacientes_lines}
 SERVIÇOS:
 {chr(10).join(svc_lines) if svc_lines else "  nenhum cadastrado"}
 HORÁRIOS: {hours_lines}
