@@ -12,7 +12,7 @@ interface UseProfessionalsReturn {
   loading: boolean
   error: string | null
   fetchProfessionals: (params?: {
-    petshop_id?: number
+    clinica_id?: number
     specialty?: string
     is_active?: boolean
   }) => Promise<Professional[]>
@@ -36,7 +36,7 @@ export function useProfessionals(): UseProfessionalsReturn {
 
   const fetchProfessionals = useCallback(
     async (params?: {
-      petshop_id?: number
+      clinica_id?: number
       specialty?: string
       is_active?: boolean
     }) => {

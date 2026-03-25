@@ -2,14 +2,14 @@ import { Request, Response } from 'express'
 import { prisma } from '../../lib/prisma'
 import { attachBusinessHoursToClinicaJson } from '../../lib/businessHoursTable'
 
-// GET /petshops - List all petshops
+// GET /clinicas - List all clinicas
 export async function listClinicas(req: Request, res: Response) {
   try {
     const { skip = 0, limit = 50, is_active } = req.query
     const where: any = {}
     if (is_active !== undefined) where.isActive = is_active === 'true'
 
-    const petshops = await prisma.clinicaProfile.findMany({
+    const clinicas = await prisma.clinicaProfile.findMany({
       where,
       skip: parseInt(skip as string),
       take: parseInt(limit as string),
@@ -20,12 +20,12 @@ export async function listClinicas(req: Request, res: Response) {
     const withHours = await Promise.all(clinicas.map((p) => attachBusinessHoursToClinicaJson(p)))
     res.json(withHours)
   } catch (error) {
-    console.error('Error listing petshops:', error)
-    res.status(500).json({ error: 'Failed to list petshops' })
+    console.error('Error listing clinicas:', error)
+    res.status(500).json({ error: 'Failed to list clinicas' })
   }
 }
 
-// GET /petshops/:clinicaId
+// GET /clinicas/:clinicaId
 export async function getClinica(req: Request, res: Response) {
   try {
     const { clinicaId } = req.params
@@ -41,7 +41,7 @@ export async function getClinica(req: Request, res: Response) {
   }
 }
 
-// POST /petshops
+// POST /clinicas
 export async function createClinica(req: Request, res: Response) {
   try {
     const { company_id, address, cep, phone, latitude, longitude, owner_phone, emergency_contact, assistant_name } = req.body
@@ -73,7 +73,7 @@ export async function createClinica(req: Request, res: Response) {
   }
 }
 
-// PATCH /petshops/:clinicaId
+// PATCH /clinicas/:clinicaId
 export async function updateClinica(req: Request, res: Response) {
   try {
     const { clinicaId } = req.params
@@ -110,7 +110,7 @@ export async function updateClinica(req: Request, res: Response) {
   }
 }
 
-// GET /petshops/info/company
+// GET /clinicas/info/company
 export async function getClinicaInfo(req: Request, res: Response) {
   try {
     const companyId = req.user!.companyId

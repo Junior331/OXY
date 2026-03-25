@@ -278,7 +278,7 @@ export async function getClientConversations(req: Request, res: Response) {
 }
 
 // GET /clients/:clientId/pacientes - Get client pacientes
-export async function getClientPets(req: Request, res: Response) {
+export async function getClientPacientes(req: Request, res: Response) {
   try {
     const companyId = req.user!.companyId
     const { clientId } = req.params as { clientId: string }

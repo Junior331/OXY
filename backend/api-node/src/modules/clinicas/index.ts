@@ -1,4 +1,4 @@
-// Barrel export for petshops module
-export * from './petshopController'
-export * from './petshopRoutes'
+// Barrel export for clinicas module
+export * from './clinicaController'
+export * from './clinicaRoutes'
 export * from './types'

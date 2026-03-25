@@ -18,7 +18,7 @@ async function buildAlerts(companyId: number): Promise<BrainAlert[]> {
 
   const [
     pendingConf,
-    pacienteirthdays,
+    pacienteBirthdays,
     churnRisk,
     hotelAlmostFull,
     lostClients,
@@ -37,7 +37,7 @@ async function buildAlerts(companyId: number): Promise<BrainAlert[]> {
 
     // 2. Aniversários de pacientes nos próximos 7 dias
     prisma.$queryRaw<Array<{ pacientename: string; client_name: string }>>`
-      SELECT * FROM get_pet_birthdays_next_days(${companyId}, 7)
+      SELECT * FROM get_paciente_birthdays_next_days(${companyId}, 7)
     `,
 
     // 3. Clientes com risco alto de churn (mês atual)
@@ -90,8 +90,8 @@ async function buildAlerts(companyId: number): Promise<BrainAlert[]> {
   }
 
   // Alerta 2 — aniversários de pacientes
-  if (pacienteirthdays.status === 'fulfilled' && pacienteirthdays.value.length > 0) {
-    const pacientes = pacienteirthdays.value
+  if (pacienteBirthdays.status === 'fulfilled' && pacienteBirthdays.value.length > 0) {
+    const pacientes = pacienteBirthdays.value
     alerts.push({
       type: 'info',
       message: `${pacientes.length} paciente${pacientes.length > 1 ? 's fazem' : ' faz'} aniversário nos próximos 7 dias: ${pacientes.map((p: any) => `${p.pacientename} (${p.client_name})`).join(', ')}.`,

@@ -18,12 +18,12 @@ function useSupportPhone() {
   const [phone, setPhone] = useState("");
 
   useEffect(() => {
-    if (!user?.petshop_id) return;
-    petshopService
-      .getPetshop(user.petshop_id)
+    if (!user?.clinica_id) return;
+    clinicaService
+      .getClinica(user.clinica_id)
       .then((p) => setPhone(p.company?.pangeiaSupport ?? ""))
       .catch(() => {});
-  }, [user?.petshop_id]);
+  }, [user?.clinica_id]);
 
   return phone;
 }

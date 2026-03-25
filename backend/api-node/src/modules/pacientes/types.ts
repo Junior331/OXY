@@ -2,7 +2,7 @@
  * Paciente types and interfaces
  */
 
-export interface CreatePetDTO {
+export interface CreatePacienteDTO {
   client_id: string
   name: string
   species?: string
@@ -22,7 +22,7 @@ export interface CreatePetDTO {
   photo_url?: string
 }
 
-export interface UpdatePetDTO {
+export interface UpdatePacienteDTO {
   name?: string
   species?: string
   breed?: string

@@ -101,7 +101,7 @@ export function useBusinessHours() {
     setSaving(true)
     try {
       // TODO: Implementar chamada à API
-      // await businessHoursService.update(petshopId, {
+      // await businessHoursService.update(clinicaId, {
       //   business_hours: businessHours,
       //   default_capacity: defaultCapacity,
       //   custom_capacities: customCapacities,
@@ -120,11 +120,11 @@ export function useBusinessHours() {
     }
   }, [businessHours, defaultCapacity, customCapacities, hourlyCapacities])
 
-  const loadBusinessHours = useCallback(async (petshopId: number) => {
+  const loadBusinessHours = useCallback(async (clinicaId: number) => {
     setLoading(true)
     try {
       // TODO: Implementar chamada à API
-      // const data = await businessHoursService.get(petshopId)
+      // const data = await businessHoursService.get(clinicaId)
       // setBusinessHours(data.business_hours)
       // setDefaultCapacity(data.default_capacity)
       // setCustomCapacities(data.custom_capacities)

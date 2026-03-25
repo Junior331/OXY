@@ -8,7 +8,7 @@ import type {
 
 export const professionalService = {
   async listProfessionals(params?: {
-    petshop_id?: number
+    clinica_id?: number
     specialty?: string
     is_active?: boolean
   }): Promise<Professional[]> {

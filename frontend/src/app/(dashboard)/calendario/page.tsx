@@ -26,7 +26,7 @@ import {
 } from "@/services";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { maskPhone, dateToISO, dateFromISO } from "@/lib/masks";
-import { normalizePetSize, PACIENTE_SIZE_OPTIONS_WITH_PLACEHOLDER } from "@/lib/pacienteSize";
+import { normalizePacienteSize, PACIENTE_SIZE_OPTIONS_WITH_PLACEHOLDER } from "@/lib/pacienteSize";
 import { UserPlus, PawPrint, Plus, Loader2 } from "lucide-react";
 import type { Appointment, Client, Paciente, Service } from "@/types";
 import {
@@ -135,9 +135,9 @@ interface FormErrors {
   slotId?: string;
   newClientName?: string;
   newClientPhone?: string;
-  newPetName?: string;
-  newPetSpecies?: string;
-  newPetSize?: string;
+  newPacienteName?: string;
+  newPacienteSpecies?: string;
+  newPacienteSize?: string;
 }
 
 
@@ -209,7 +209,7 @@ function getInitials(name: string): string {
 export default function CalendarioPage() {
   const { user } = useAuthContext();
   const toast = useToast();
-  const petshopId = user?.petshop_id ?? 0;
+  const clinicaId = user?.clinica_id ?? 0;
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
@@ -218,19 +218,19 @@ export default function CalendarioPage() {
   const [eventsLoading, setEventsLoading] = useState(true);
 
   const [clients, setClients] = useState<Client[]>([]);
-  const [clientPets, setClientPets] = useState<Paciente[]>([]);
+  const [clientPacientes, setClientPacientes] = useState<Paciente[]>([]);
   const [services, setServices] = useState<Service[]>([]);
 
   const [showNewClientForm, setShowNewClientForm] = useState(false);
   const [newClientName, setNewClientName] = useState("");
   const [newClientPhone, setNewClientPhone] = useState("");
   const [isCreatingClient, setIsCreatingClient] = useState(false);
-  const [showNewPetForm, setShowNewPetForm] = useState(false);
-  const [newPetName, setNewPetName] = useState("");
-  const [newPetSpecies, setNewPetSpecies] = useState("");
-  const [newPetBreed, setNewPetBreed] = useState("");
-  const [newPetSize, setNewPetSize] = useState("");
-  const [isCreatingPet, setIsCreatingPet] = useState(false);
+  const [showNewPacienteForm, setShowNewPacienteForm] = useState(false);
+  const [newPacienteName, setNewPacienteName] = useState("");
+  const [newPacienteSpecies, setNewPacienteSpecies] = useState("");
+  const [newPacienteBreed, setNewPacienteBreed] = useState("");
+  const [newPacienteSize, setNewPacienteSize] = useState("");
+  const [isCreatingPaciente, setIsCreatingPaciente] = useState(false);
 
   /** Evita tela cheia de "Carregando..." se um re-fetch acontecer após já termos dados. */
   const hasLoadedEventsRef = useRef(false);
@@ -305,7 +305,7 @@ export default function CalendarioPage() {
   const [statusActionLoadingId, setStatusActionLoadingId] = useState<
     string | null
   >(null);
-  const [clientPetsLoading, setClientPetsLoading] = useState(false);
+  const [clientPacientesLoading, setClientPacientesLoading] = useState(false);
   const [availableDates, setAvailableDates] = useState<Set<string>>(
     new Set(),
   );
@@ -320,7 +320,7 @@ export default function CalendarioPage() {
   const availabilityCache = useRef<Map<string, MonthAvailabilityCache>>(
     new Map(),
   );
-  const clientPetsCache = useRef<Map<string, Paciente[]>>(new Map());
+  const clientPacientesCache = useRef<Map<string, Paciente[]>>(new Map());
 
   // Only fetch slots when both date AND service are selected
   const {
@@ -352,38 +352,38 @@ export default function CalendarioPage() {
   useEffect(() => {
     const fetchClientPets = async () => {
       if (!formData.clientId) {
-        setClientPets([]);
-        setClientPetsLoading(false);
+        setClientPacientes([]);
+        setClientPacientesLoading(false);
         return;
       }
-      const cacheKey = `${formData.clientId}|${petshopId || 0}`;
-      const cachedPets = clientPetsCache.current.get(cacheKey);
+      const cacheKey = `${formData.clientId}|${clinicaId || 0}`;
+      const cachedPets = clientPacientesCache.current.get(cacheKey);
       if (cachedPets) {
-        setClientPets(cachedPets);
-        setClientPetsLoading(false);
+        setClientPacientes(cachedPets);
+        setClientPacientesLoading(false);
         return;
       }
-      setClientPetsLoading(true);
+      setClientPacientesLoading(true);
       try {
         const pacientes = await clientService.getClientPets(
           formData.clientId,
-          petshopId || undefined,
+          clinicaId || undefined,
         );
-        clientPetsCache.current.set(cacheKey, pacientes);
-        setClientPets(pacientes);
+        clientPacientesCache.current.set(cacheKey, pacientes);
+        setClientPacientes(pacientes);
       } catch (error) {
         console.error("Erro ao buscar pacientes do cliente:", error);
-        setClientPets([]);
+        setClientPacientes([]);
         toast.error(
           "Erro ao carregar pacientes",
           "Não foi possível carregar os pacientes do cliente selecionado.",
         );
       } finally {
-        setClientPetsLoading(false);
+        setClientPacientesLoading(false);
       }
     };
     fetchClientPets();
-  }, [formData.clientId, petshopId, toast]);
+  }, [formData.clientId, clinicaId, toast]);
 
   const bookableServices = useMemo(
     () =>
@@ -596,13 +596,13 @@ export default function CalendarioPage() {
     setNewClientName("");
     setNewClientPhone("");
     setIsCreatingClient(false);
-    setShowNewPetForm(false);
-    setNewPetName("");
-    setNewPetSpecies("");
-    setNewPetBreed("");
-    setNewPetSize("");
-    setIsCreatingPet(false);
-    setClientPets([]);
+    setShowNewPacienteForm(false);
+    setNewPacienteName("");
+    setNewPacienteSpecies("");
+    setNewPacienteBreed("");
+    setNewPacienteSize("");
+    setIsCreatingPaciente(false);
+    setClientPacientes([]);
   };
 
   const handleCreateClient = async () => {
@@ -646,38 +646,38 @@ export default function CalendarioPage() {
 
   const handleCreatePet = async () => {
     const errs: FormErrors = {};
-    if (!newPetName.trim()) errs.newPetName = "Nome do paciente é obrigatório";
-    if (!newPetSpecies) errs.newPetSpecies = "Espécie é obrigatória";
-    if (!newPetSize) errs.newPetSize = "Porte é obrigatório";
+    if (!newPacienteName.trim()) errs.newPacienteName = "Nome do paciente é obrigatório";
+    if (!newPacienteSpecies) errs.newPacienteSpecies = "Espécie é obrigatória";
+    if (!newPacienteSize) errs.newPacienteSize = "Porte é obrigatório";
     if (Object.keys(errs).length > 0) {
       setFormErrors((prev) => ({ ...prev, ...errs }));
       return;
     }
-    if (!formData.clientId || isCreatingPet) return;
+    if (!formData.clientId || isCreatingPaciente) return;
 
-    setIsCreatingPet(true);
+    setIsCreatingPaciente(true);
     try {
-      const newPet = await pacienteService.createPet({
-        petshop_id: petshopId,
+      const newPaciente = await pacienteService.createPet({
+        clinica_id: clinicaId,
         client_id: formData.clientId,
-        name: newPetName,
-        species: newPetSpecies,
-        breed: newPetBreed || undefined,
-        size: normalizePetSize(newPetSize),
+        name: newPacienteName,
+        species: newPacienteSpecies,
+        breed: newPacienteBreed || undefined,
+        size: normalizePacienteSize(newPacienteSize),
       });
-      setClientPets((prev) => [...prev, newPet]);
-      const cacheKey = `${formData.clientId}|${petshopId || 0}`;
-      const currentCached = clientPetsCache.current.get(cacheKey) ?? [];
-      clientPetsCache.current.set(cacheKey, [...currentCached, newPet]);
-      setFormData((prev) => ({ ...prev, pacienteId: newPet.id }));
-      setShowNewPetForm(false);
-      setNewPetName("");
-      setNewPetSpecies("cachorro");
-      setNewPetBreed("");
-      setNewPetSize("medio");
+      setClientPacientes((prev) => [...prev, newPaciente]);
+      const cacheKey = `${formData.clientId}|${clinicaId || 0}`;
+      const currentCached = clientPacientesCache.current.get(cacheKey) ?? [];
+      clientPacientesCache.current.set(cacheKey, [...currentCached, newPaciente]);
+      setFormData((prev) => ({ ...prev, pacienteId: newPaciente.id }));
+      setShowNewPacienteForm(false);
+      setNewPacienteName("");
+      setNewPacienteSpecies("cachorro");
+      setNewPacienteBreed("");
+      setNewPacienteSize("medio");
       toast.success(
         "Paciente criado",
-        `${newPet.name ?? newPetName} foi cadastrado e selecionado.`,
+        `${newPaciente.name ?? newPacienteName} foi cadastrado e selecionado.`,
       );
     } catch (error) {
       console.error("Erro ao criar paciente:", error);
@@ -688,7 +688,7 @@ export default function CalendarioPage() {
           "Não foi possível criar o paciente.",
       );
     } finally {
-      setIsCreatingPet(false);
+      setIsCreatingPaciente(false);
     }
   };
 
@@ -819,7 +819,7 @@ export default function CalendarioPage() {
     setIsSubmitting(true);
 
     try {
-      const selectedPet = clientPets.find((p) => p.id === formData.pacienteId);
+      const selectedPaciente = clientPacientes.find((p) => p.id === formData.pacienteId);
       const scheduledAt = `${dateISO}T${selectedSlot.time}:00`;
 
       await appointmentService.scheduleAppointment({
@@ -1078,41 +1078,41 @@ export default function CalendarioPage() {
                 </p>
                 <button
                   type="button"
-                  disabled={isCreatingPet}
+                  disabled={isCreatingPaciente}
                   onClick={() => {
-                    setShowNewPetForm(!showNewPetForm);
-                    setFormErrors((prev) => ({ ...prev, newPetName: undefined, newPetSpecies: undefined, newPetSize: undefined }));
+                    setShowNewPacienteForm(!showNewPacienteForm);
+                    setFormErrors((prev) => ({ ...prev, newPacienteName: undefined, newPacienteSpecies: undefined, newPacienteSize: undefined }));
                   }}
                   className="flex items-center gap-1 text-xs font-medium text-[#1E62EC] hover:underline dark:text-[#2172e5]"
                 >
                   <PawPrint className="h-3.5 w-3.5" />
-                  {showNewPetForm ? "Cancelar" : "Novo Paciente"}
+                  {showNewPacienteForm ? "Cancelar" : "Novo Paciente"}
                 </button>
               </div>
-              {showNewPetForm ? (
+              {showNewPacienteForm ? (
                 <div className="space-y-3 rounded-lg border border-[#727B8E]/20 bg-[#F4F6F9] p-3 dark:border-[#40485A] dark:bg-[#212225]">
                   <div>
                     <Input
                       label="Nome do Paciente *"
                       placeholder="Nome do paciente"
-                      value={newPetName}
+                      value={newPacienteName}
                       onChange={(e) => {
-                        setNewPetName(e.target.value);
-                        if (e.target.value) setFormErrors((prev) => ({ ...prev, newPetName: undefined }));
+                        setNewPacienteName(e.target.value);
+                        if (e.target.value) setFormErrors((prev) => ({ ...prev, newPacienteName: undefined }));
                       }}
                     />
-                    {formErrors.newPetName && (
-                      <p className="mt-1 text-xs text-red-500">{formErrors.newPetName}</p>
+                    {formErrors.newPacienteName && (
+                      <p className="mt-1 text-xs text-red-500">{formErrors.newPacienteName}</p>
                     )}
                   </div>
                   <div>
                     <Select
                       label="Espécie *"
                       placeholder="Selecione a espécie"
-                      value={newPetSpecies}
+                      value={newPacienteSpecies}
                       onChange={(e) => {
-                        setNewPetSpecies(e.target.value);
-                        if (e.target.value) setFormErrors((prev) => ({ ...prev, newPetSpecies: undefined }));
+                        setNewPacienteSpecies(e.target.value);
+                        if (e.target.value) setFormErrors((prev) => ({ ...prev, newPacienteSpecies: undefined }));
                       }}
                       options={[
                         { value: "", label: "Selecione a espécie" },
@@ -1123,29 +1123,29 @@ export default function CalendarioPage() {
                         { value: "outro", label: "Outro" },
                       ]}
                     />
-                    {formErrors.newPetSpecies && (
-                      <p className="mt-1 text-xs text-red-500">{formErrors.newPetSpecies}</p>
+                    {formErrors.newPacienteSpecies && (
+                      <p className="mt-1 text-xs text-red-500">{formErrors.newPacienteSpecies}</p>
                     )}
                   </div>
                   <Input
                     label="Raça"
                     placeholder="Raça do paciente"
-                    value={newPetBreed}
-                    onChange={(e) => setNewPetBreed(e.target.value)}
+                    value={newPacienteBreed}
+                    onChange={(e) => setNewPacienteBreed(e.target.value)}
                   />
                   <div>
                     <Select
                       label="Porte *"
                       placeholder="Selecione o porte"
-                      value={newPetSize}
+                      value={newPacienteSize}
                       onChange={(e) => {
-                        setNewPetSize(e.target.value);
-                        if (e.target.value) setFormErrors((prev) => ({ ...prev, newPetSize: undefined }));
+                        setNewPacienteSize(e.target.value);
+                        if (e.target.value) setFormErrors((prev) => ({ ...prev, newPacienteSize: undefined }));
                       }}
                       options={[...PACIENTE_SIZE_OPTIONS_WITH_PLACEHOLDER]}
                     />
-                    {formErrors.newPetSize && (
-                      <p className="mt-1 text-xs text-red-500">{formErrors.newPetSize}</p>
+                    {formErrors.newPacienteSize && (
+                      <p className="mt-1 text-xs text-red-500">{formErrors.newPacienteSize}</p>
                     )}
                   </div>
                   <button
@@ -1167,7 +1167,7 @@ export default function CalendarioPage() {
                     )}
                   </button>
                 </div>
-              ) : clientPetsLoading ? (
+              ) : clientPacientesLoading ? (
                 <div className="flex items-center gap-2 rounded-lg border border-[#727B8E]/20 bg-[#F4F6F9] p-3 dark:border-[#40485A] dark:bg-[#212225]">
                   <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#1E62EC] dark:text-[#2172e5]" />
                   <span className="text-sm text-[#727B8E] dark:text-[#8a94a6]">
@@ -1183,7 +1183,7 @@ export default function CalendarioPage() {
                       setFormErrors((prev) => ({ ...prev, pacienteId: undefined }));
                       handleFormChange("pacienteId", e.target.value);
                     }}
-                    options={clientPets.map((p) => ({
+                    options={clientPacientes.map((p) => ({
                       value: p.id,
                       label: `${p.name ?? "Paciente"} (${p.species ?? "Paciente"})`,
                     }))}

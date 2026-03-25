@@ -9,7 +9,7 @@ import type {
   DailyLogUpdate,
 } from '@/types'
 
-export function useBoarding(petshopId: number) {
+export function useBoarding(clinicaId: number) {
   const [stays, setStays] = useState<BoardingStay[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -20,7 +20,7 @@ export function useBoarding(petshopId: number) {
         setLoading(true)
         setError(null)
         const data = await boardingService.getActiveBoardings(
-          petshopId,
+          clinicaId,
           serviceType
         )
         setStays(data)
@@ -34,7 +34,7 @@ export function useBoarding(petshopId: number) {
         setLoading(false)
       }
     },
-    [petshopId]
+    [clinicaId]
   )
 
   const checkIn = useCallback(
@@ -42,7 +42,7 @@ export function useBoarding(petshopId: number) {
       try {
         setLoading(true)
         setError(null)
-        const newStay = await boardingService.checkIn(petshopId, checkInData)
+        const newStay = await boardingService.checkIn(clinicaId, checkInData)
         setStays((prev) => [newStay, ...prev])
         return newStay
       } catch (err: any) {
@@ -54,7 +54,7 @@ export function useBoarding(petshopId: number) {
         setLoading(false)
       }
     },
-    [petshopId]
+    [clinicaId]
   )
 
   const checkOut = useCallback(
@@ -64,7 +64,7 @@ export function useBoarding(petshopId: number) {
         setError(null)
         const updatedStay = await boardingService.checkOut(
           stayId,
-          petshopId,
+          clinicaId,
           checkOutData
         )
         setStays((prev) =>
@@ -80,7 +80,7 @@ export function useBoarding(petshopId: number) {
         setLoading(false)
       }
     },
-    [petshopId]
+    [clinicaId]
   )
 
   return {
@@ -93,7 +93,7 @@ export function useBoarding(petshopId: number) {
   }
 }
 
-export function useBoardingStay(stayId: string | null, petshopId: number) {
+export function useBoardingStay(stayId: string | null, clinicaId: number) {
   const [stay, setStay] = useState<BoardingStay | null>(null)
   const [dailyLogs, setDailyLogs] = useState<DailyLog[]>([])
   const [loading, setLoading] = useState(false)
@@ -105,7 +105,7 @@ export function useBoardingStay(stayId: string | null, petshopId: number) {
     try {
       setLoading(true)
       setError(null)
-      const data = await boardingService.getBoarding(stayId, petshopId)
+      const data = await boardingService.getBoarding(stayId, clinicaId)
       setStay(data)
       return data
     } catch (err: any) {
@@ -116,7 +116,7 @@ export function useBoardingStay(stayId: string | null, petshopId: number) {
     } finally {
       setLoading(false)
     }
-  }, [stayId, petshopId])
+  }, [stayId, clinicaId])
 
   const fetchDailyLogs = useCallback(async () => {
     if (!stayId) return
@@ -124,7 +124,7 @@ export function useBoardingStay(stayId: string | null, petshopId: number) {
     try {
       setLoading(true)
       setError(null)
-      const data = await boardingService.getDailyLogs(stayId, petshopId)
+      const data = await boardingService.getDailyLogs(stayId, clinicaId)
       setDailyLogs(data)
       return data
     } catch (err: any) {
@@ -135,7 +135,7 @@ export function useBoardingStay(stayId: string | null, petshopId: number) {
     } finally {
       setLoading(false)
     }
-  }, [stayId, petshopId])
+  }, [stayId, clinicaId])
 
   const createDailyLog = useCallback(
     async (logData: DailyLogCreate) => {
@@ -146,7 +146,7 @@ export function useBoardingStay(stayId: string | null, petshopId: number) {
         setError(null)
         const newLog = await boardingService.createDailyLog(
           stayId,
-          petshopId,
+          clinicaId,
           logData
         )
         setDailyLogs((prev) => [newLog, ...prev])
@@ -160,7 +160,7 @@ export function useBoardingStay(stayId: string | null, petshopId: number) {
         setLoading(false)
       }
     },
-    [stayId, petshopId]
+    [stayId, clinicaId]
   )
 
   const updateDailyLog = useCallback(
@@ -170,7 +170,7 @@ export function useBoardingStay(stayId: string | null, petshopId: number) {
         setError(null)
         const updatedLog = await boardingService.updateDailyLog(
           logId,
-          petshopId,
+          clinicaId,
           logData
         )
         setDailyLogs((prev) =>
@@ -186,7 +186,7 @@ export function useBoardingStay(stayId: string | null, petshopId: number) {
         setLoading(false)
       }
     },
-    [petshopId]
+    [clinicaId]
   )
 
   return {

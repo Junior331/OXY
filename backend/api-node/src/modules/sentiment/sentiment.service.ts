@@ -3,7 +3,7 @@ import type { SentimentResult } from './sentiment.types'
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
 
-const SYSTEM_PROMPT = `Você é um analista de relacionamento com clientes de petshops.
+const SYSTEM_PROMPT = `Você é um analista de relacionamento com clientes de clínicas.
 Analise as mensagens abaixo e retorne SOMENTE um JSON válido, sem texto antes ou depois, sem markdown, sem blocos de código.
 
 O JSON deve ter exatamente esta estrutura:

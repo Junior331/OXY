@@ -16,7 +16,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { normalizePetSize, pacienteSizeAbbrev, PACIENTE_SIZE_OPTIONS, PACIENTE_SIZE_OPTIONS_WITH_PLACEHOLDER } from "@/lib/pacienteSize";
+import { normalizePacienteSize, pacienteSizeAbbrev, PACIENTE_SIZE_OPTIONS, PACIENTE_SIZE_OPTIONS_WITH_PLACEHOLDER } from "@/lib/pacienteSize";
 import { formatPhoneForDisplay, maskPhone, dateFromISO, dateToISO } from "@/lib/masks";
 import { useAddressByCep, useToast } from "@/hooks";
 import { useAuthContext } from "@/contexts";
@@ -311,7 +311,7 @@ interface PacienteFormData {
   notes: string;
 }
 
-const emptyPetForm: PacienteFormData = {
+const emptyPacienteForm: PacienteFormData = {
   name: "",
   species: "",
   breed: "",
@@ -342,10 +342,10 @@ function CustomerDetails({
   onBack: () => void;
   onEditCustomer: () => void;
   onDeleteCustomer: (id: string) => void;
-  onDeletePet: (pacienteId: string) => void;
+  onDeletePaciente: (pacienteId: string) => void;
   onDeleteAppointment: (appointmentId: string) => void;
   deletingAppointmentId?: string | null;
-  onSavePet: (
+  onSavePaciente: (
     paciente: Omit<Paciente, "id" | "customerId">,
     pacienteId?: string,
   ) => Promise<void>;
@@ -356,15 +356,15 @@ function CustomerDetails({
   loadingAppointments?: boolean;
   loadingConversations?: boolean;
 }) {
-  const [pacienteModalOpen, setPetModalOpen] = useState(false);
-  const [editingPet, setEditingPet] = useState<Paciente | null>(null);
-  const [pacienteForm, setPetForm] = useState<PacienteFormData>(emptyPetForm);
-  const [pacienteFormErrors, setPetFormErrors] = useState<{
+  const [pacienteModalOpen, setPacienteModalOpen] = useState(false);
+  const [editingPaciente, setEditingPaciente] = useState<Paciente | null>(null);
+  const [pacienteForm, setPacienteForm] = useState<PacienteFormData>(emptyPacienteForm);
+  const [pacienteFormErrors, setPacienteFormErrors] = useState<{
     name?: string;
     species?: string;
     size?: string;
   }>({});
-  const [savingPet, setSavingPet] = useState(false);
+  const [savingPaciente, setSavingPaciente] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
   if (!customer) {
@@ -389,46 +389,46 @@ function CustomerDetails({
     );
   }
 
-  const handleOpenPetModal = (paciente?: Paciente) => {
-    setEditingPet(paciente || null);
+  const handleOpenPacienteModal = (paciente?: Paciente) => {
+    setEditingPaciente(paciente || null);
     if (paciente) {
-      setPetForm({
+      setPacienteForm({
         name: paciente.name,
         species: paciente.species,
         breed: paciente.breed,
         age: paciente.age,
         weight: paciente.weight,
-        size: normalizePetSize(paciente.size) ?? "",
+        size: normalizePacienteSize(paciente.size) ?? "",
         color: paciente.color,
         notes: paciente.notes,
       });
     } else {
-      setPetForm(emptyPetForm);
+      setPacienteForm(emptyPacienteForm);
     }
-    setPetModalOpen(true);
+    setPacienteModalOpen(true);
   };
 
-  const handleSavePet = async () => {
+  const handleSavePaciente = async () => {
     const errs: { name?: string; species?: string; size?: string } = {};
     if (!pacienteForm.name.trim()) errs.name = "Nome é obrigatório";
     if (!pacienteForm.species) errs.species = "Espécie é obrigatória";
     if (!pacienteForm.size) errs.size = "Porte é obrigatório";
     if (Object.keys(errs).length > 0) {
-      setPetFormErrors(errs);
+      setPacienteFormErrors(errs);
       return;
     }
-    setPetFormErrors({});
+    setPacienteFormErrors({});
 
-    setSavingPet(true);
+    setSavingPaciente(true);
     try {
-      await onSavePet(pacienteForm as Omit<Paciente, "id" | "customerId">, editingPet?.id);
-      setPetModalOpen(false);
-      setPetForm(emptyPetForm);
-      setEditingPet(null);
+      await onSavePaciente(pacienteForm as Omit<Paciente, "id" | "customerId">, editingPaciente?.id);
+      setPacienteModalOpen(false);
+      setPacienteForm(emptyPacienteForm);
+      setEditingPaciente(null);
     } catch {
       // The parent already handles user-facing feedback.
     } finally {
-      setSavingPet(false);
+      setSavingPaciente(false);
     }
   };
 
@@ -567,7 +567,7 @@ function CustomerDetails({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => handleOpenPetModal()}
+                  onClick={() => handleOpenPacienteModal()}
                 >
                   <Plus className="h-4 w-4 mr-1" />
                   Novo Paciente
@@ -609,14 +609,14 @@ function CustomerDetails({
                         <div className="flex items-center gap-1">
                           <button
                             type="button"
-                            onClick={() => handleOpenPetModal(paciente)}
+                            onClick={() => handleOpenPacienteModal(paciente)}
                             className="flex h-8 w-8 items-center justify-center rounded-full text-[#727B8E] hover:bg-[#F4F6F9] dark:hover:bg-[#212225]"
                           >
                             <Edit className="h-4 w-4" />
                           </button>
                           <button
                             type="button"
-                            onClick={() => void onDeletePet(paciente.id)}
+                            onClick={() => void onDeletePaciente(paciente.id)}
                             className="flex h-8 w-8 items-center justify-center rounded-full text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -764,15 +764,15 @@ function CustomerDetails({
       <Modal
         isOpen={pacienteModalOpen}
         onClose={() => {
-          setPetModalOpen(false);
-          setPetForm(emptyPetForm);
-          setPetFormErrors({});
-          setEditingPet(null);
+          setPacienteModalOpen(false);
+          setPacienteForm(emptyPacienteForm);
+          setPacienteFormErrors({});
+          setEditingPaciente(null);
         }}
-        title={editingPet ? "Editar paciente" : "Novo paciente"}
-        onSubmit={() => void handleSavePet()}
+        title={editingPaciente ? "Editar paciente" : "Novo paciente"}
+        onSubmit={() => void handleSavePaciente()}
         submitText="Salvar"
-        isLoading={savingPet}
+        isLoading={savingPaciente}
         className="max-w-[400px] max-h-[85vh] flex flex-col overflow-hidden"
       >
         <div className="flex flex-col gap-4 overflow-y-auto max-h-[320px]">
@@ -782,8 +782,8 @@ function CustomerDetails({
               placeholder="Nome"
               value={pacienteForm.name}
               onChange={(e) => {
-                setPetForm((prev) => ({ ...prev, name: e.target.value }));
-                if (e.target.value) setPetFormErrors((prev) => ({ ...prev, name: undefined }));
+                setPacienteForm((prev) => ({ ...prev, name: e.target.value }));
+                if (e.target.value) setPacienteFormErrors((prev) => ({ ...prev, name: undefined }));
               }}
             />
             {pacienteFormErrors.name && (
@@ -795,8 +795,8 @@ function CustomerDetails({
               label="Espécie *"
               value={pacienteForm.species}
               onChange={(e) => {
-                setPetForm((prev) => ({ ...prev, species: e.target.value }));
-                if (e.target.value) setPetFormErrors((prev) => ({ ...prev, species: undefined }));
+                setPacienteForm((prev) => ({ ...prev, species: e.target.value }));
+                if (e.target.value) setPacienteFormErrors((prev) => ({ ...prev, species: undefined }));
               }}
               options={[
                 { value: "cachorro", label: "Cachorro" },
@@ -816,7 +816,7 @@ function CustomerDetails({
               placeholder="Raça"
               value={pacienteForm.breed}
               onChange={(e) =>
-                setPetForm((prev) => ({ ...prev, breed: e.target.value }))
+                setPacienteForm((prev) => ({ ...prev, breed: e.target.value }))
               }
             />
             <Input
@@ -824,7 +824,7 @@ function CustomerDetails({
               placeholder="Idade"
               value={pacienteForm.age}
               onChange={(e) =>
-                setPetForm((prev) => ({ ...prev, age: e.target.value }))
+                setPacienteForm((prev) => ({ ...prev, age: e.target.value }))
               }
             />
           </div>
@@ -834,7 +834,7 @@ function CustomerDetails({
               placeholder="Peso"
               value={pacienteForm.weight}
               onChange={(e) =>
-                setPetForm((prev) => ({ ...prev, weight: e.target.value }))
+                setPacienteForm((prev) => ({ ...prev, weight: e.target.value }))
               }
             />
             <div>
@@ -842,8 +842,8 @@ function CustomerDetails({
                 label="Porte *"
                 value={pacienteForm.size}
                 onChange={(e) => {
-                  setPetForm((prev) => ({ ...prev, size: e.target.value }));
-                  if (e.target.value) setPetFormErrors((prev) => ({ ...prev, size: undefined }));
+                  setPacienteForm((prev) => ({ ...prev, size: e.target.value }));
+                  if (e.target.value) setPacienteFormErrors((prev) => ({ ...prev, size: undefined }));
                 }}
                 options={[...PACIENTE_SIZE_OPTIONS]}
               />
@@ -857,7 +857,7 @@ function CustomerDetails({
             placeholder="Cor"
             value={pacienteForm.color}
             onChange={(e) =>
-              setPetForm((prev) => ({ ...prev, color: e.target.value }))
+              setPacienteForm((prev) => ({ ...prev, color: e.target.value }))
             }
           />
           <TextAreaField
@@ -866,7 +866,7 @@ function CustomerDetails({
             placeholder="Observações"
             value={pacienteForm.notes}
             onChange={(e) =>
-              setPetForm((prev) => ({ ...prev, notes: e.target.value }))
+              setPacienteForm((prev) => ({ ...prev, notes: e.target.value }))
             }
             rows={3}
           />
@@ -893,7 +893,7 @@ type ApiClient = Client & {
   totalConversations?: number | null;
 };
 
-type ApiPet = PacienteType & {
+type ApiPaciente = PacienteType & {
   birthDate?: string | null;
   birth_date?: string | null;
   weightKg?: number | string | null;
@@ -903,12 +903,12 @@ type ApiPet = PacienteType & {
   is_active?: boolean | null;
 };
 
-type ApiPetAppointment = ApiAppointment & {
+type ApiPacienteAppointment = ApiAppointment & {
   paciente_id?: string | null;
 };
 
 
-function formatPetAge(paciente: ApiPet): string {
+function formatPacienteAge(paciente: ApiPaciente): string {
   if (paciente.age !== undefined && paciente.age !== null) {
     return String(paciente.age);
   }
@@ -932,7 +932,7 @@ function formatPetAge(paciente: ApiPet): string {
   return age >= 0 ? String(age) : "";
 }
 
-function formatPetWeight(paciente: ApiPet): string {
+function formatPacienteWeight(paciente: ApiPaciente): string {
   const value = paciente.weight ?? paciente.weightKg ?? paciente.weight_kg;
   if (value === undefined || value === null) {
     return "";
@@ -944,7 +944,7 @@ function formatPetWeight(paciente: ApiPet): string {
   return String(value);
 }
 
-function getPetNotes(paciente: ApiPet): string {
+function getPacienteNotes(paciente: ApiPaciente): string {
   if (typeof paciente.notes === "string" && paciente.notes.trim()) {
     return paciente.notes.trim();
   }
@@ -981,18 +981,18 @@ function getPetNotes(paciente: ApiPet): string {
   return "";
 }
 
-function mapPetFromApi(paciente: ApiPet, customerId: string): Paciente {
+function mapPacienteFromApi(paciente: ApiPaciente, customerId: string): Paciente {
   return {
     id: paciente.id,
     customerId,
     name: paciente.name,
     species: (paciente.species as Paciente["species"]) || "outro",
     breed: paciente.breed || "",
-    age: formatPetAge(paciente),
-    weight: formatPetWeight(paciente),
-    size: normalizePetSize(paciente.size) ?? paciente.size ?? "",
+    age: formatPacienteAge(paciente),
+    weight: formatPacienteWeight(paciente),
+    size: normalizePacienteSize(paciente.size) ?? paciente.size ?? "",
     color: paciente.color || "",
-    notes: getPetNotes(paciente),
+    notes: getPacienteNotes(paciente),
   };
 }
 
@@ -1003,7 +1003,7 @@ function normalizeAppointmentStatus(
 }
 
 function mapAppointmentFromApi(
-  appointment: ApiPetAppointment,
+  appointment: ApiPacienteAppointment,
   customerId: string,
 ): Appointment {
   const scheduledDate = new Date(appointment.scheduled_at);
@@ -1146,7 +1146,7 @@ export default function ClientesPage() {
     setCustomerStep(2);
   }, [customerForm.name, customerForm.phone, editingCustomer]);
 
-  const [loadingPets, setLoadingPets] = useState(false);
+  const [loadingPacientes, setLoadingPacientes] = useState(false);
   const [loadingAppointments, setLoadingAppointments] = useState(false);
   const [loadingConversations, setLoadingConversations] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -1205,24 +1205,24 @@ export default function ClientesPage() {
     }
   }, [customerModalOpen, editingCustomer, resetAddress]);
 
-  const loadPets = useCallback(
+  const loadPacientes = useCallback(
     async (customerId: string) => {
       const alreadyLoaded = loadedTabs[customerId]?.has("pacientes");
       if (alreadyLoaded) return;
 
-      setLoadingPets(true);
+      setLoadingPacientes(true);
       try {
-        const pacientes = await clientService.getClientPets(
+        const pacientes = await clientService.getClientPacientes(
           customerId,
-          user?.petshop_id,
+          user?.clinica_id,
         );
-        const mappedPets = pacientes.map((paciente) =>
-          mapPetFromApi(paciente as ApiPet, customerId),
+        const mappedPacientes = pacientes.map((paciente) =>
+          mapPacienteFromApi(paciente as ApiPaciente, customerId),
         );
         setCustomers((prev) =>
           prev.map((c) =>
             c.id === customerId
-              ? { ...c, pacientes: mappedPets, petsCount: mappedPets.length }
+              ? { ...c, pacientes: mappedPacientes, petsCount: mappedPacientes.length }
               : c,
           ),
         );
@@ -1233,10 +1233,10 @@ export default function ClientesPage() {
       } catch (error) {
         console.error("Erro ao carregar pacientes:", error);
       } finally {
-        setLoadingPets(false);
+        setLoadingPacientes(false);
       }
     },
-    [user?.petshop_id, loadedTabs],
+    [user?.clinica_id, loadedTabs],
   );
 
   const loadConversations = useCallback(
@@ -1289,7 +1289,7 @@ export default function ClientesPage() {
           client_id: customerId,
         });
         const mappedAppointments = appointments.map((appointment) =>
-          mapAppointmentFromApi(appointment as ApiPetAppointment, customerId),
+          mapAppointmentFromApi(appointment as ApiPacienteAppointment, customerId),
         );
         const mergedAppointments = mergePairedByTime(
           mappedAppointments,
@@ -1328,21 +1328,21 @@ export default function ClientesPage() {
       if (!customer) return;
 
       if (tab === "pacientes") {
-        loadPets(selectedId);
+        loadPacientes(selectedId);
       } else if (tab === "agendamentos") {
         loadAppointments(selectedId);
       } else if (tab === "conversas") {
         loadConversations(selectedId);
       }
     },
-    [selectedId, customers, loadPets, loadAppointments, loadConversations],
+    [selectedId, customers, loadPacientes, loadAppointments, loadConversations],
   );
 
   useEffect(() => {
     if (!selectedId) return;
 
     if (activeTab === "pacientes") {
-      loadPets(selectedId);
+      loadPacientes(selectedId);
       return;
     }
 
@@ -1352,7 +1352,7 @@ export default function ClientesPage() {
     }
 
     loadConversations(selectedId);
-  }, [selectedId, activeTab, loadPets, loadAppointments, loadConversations]);
+  }, [selectedId, activeTab, loadPacientes, loadAppointments, loadConversations]);
 
   const handleDeleteCustomer = async (customerId: string) => {
     const customer = customers.find((item) => item.id === customerId);
@@ -1380,13 +1380,13 @@ export default function ClientesPage() {
     }
   };
 
-  const handleDeletePet = async (pacienteId: string) => {
+  const handleDeletePaciente = async (pacienteId: string) => {
     if (!selectedCustomer) return;
 
     const paciente = selectedCustomer.pacientes.find((item) => item.id === pacienteId);
 
     try {
-      await pacienteService.deletePet(pacienteId);
+      await pacienteService.deletePaciente(pacienteId);
       setCustomers((prev) =>
         prev.map((c) =>
           c.id === selectedCustomer.id
@@ -1494,19 +1494,19 @@ export default function ClientesPage() {
     }
   };
 
-  const handleSavePet = useCallback(
+  const handleSavePaciente = useCallback(
     async (pacienteData: Omit<Paciente, "id" | "customerId">, pacienteId?: string) => {
       if (!selectedCustomer) return;
 
       try {
         if (pacienteId) {
-          const updated = await pacienteService.updatePet(pacienteId, {
+          const updated = await pacienteService.updatePaciente(pacienteId, {
             name: pacienteData.name,
             species: pacienteData.species,
             breed: pacienteData.breed || undefined,
             birthDate: ageToBirthDate(pacienteData.age),
             weightKg: parseWeightKg(pacienteData.weight),
-            size: normalizePetSize(pacienteData.size),
+            size: normalizePacienteSize(pacienteData.size),
             color: pacienteData.color || undefined,
             notes: pacienteData.notes || undefined,
           });
@@ -1517,7 +1517,7 @@ export default function ClientesPage() {
                 ...c,
                 pacientes: c.pacientes.map((p) =>
                   p.id === pacienteId
-                    ? mapPetFromApi(updated as ApiPet, selectedCustomer.id)
+                    ? mapPacienteFromApi(updated as ApiPaciente, selectedCustomer.id)
                     : p,
                 ),
               };
@@ -1530,26 +1530,26 @@ export default function ClientesPage() {
               : "O paciente foi atualizado com sucesso.",
           );
         } else {
-          const created = await pacienteService.createPet({
-            petshop_id: user?.petshop_id || 1,
+          const created = await pacienteService.createPaciente({
+            clinica_id: user?.clinica_id || 1,
             client_id: selectedCustomer.id,
             name: pacienteData.name,
             species: pacienteData.species,
             breed: pacienteData.breed || undefined,
             birthDate: ageToBirthDate(pacienteData.age),
             weightKg: parseWeightKg(pacienteData.weight),
-            size: normalizePetSize(pacienteData.size),
+            size: normalizePacienteSize(pacienteData.size),
             color: pacienteData.color || undefined,
             notes: pacienteData.notes || undefined,
           });
-          const newPet = mapPetFromApi(created as ApiPet, selectedCustomer.id);
+          const newPaciente = mapPacienteFromApi(created as ApiPaciente, selectedCustomer.id);
           setCustomers((prev) =>
             prev.map((c) => {
               if (c.id !== selectedCustomer.id) return c;
               return {
                 ...c,
                 petsCount: c.petsCount + 1,
-                pacientes: [...c.pacientes, newPet],
+                pacientes: [...c.pacientes, newPaciente],
               };
             }),
           );
@@ -1688,14 +1688,14 @@ export default function ClientesPage() {
             setCustomerModalOpen(true);
           }}
           onDeleteCustomer={handleDeleteCustomer}
-          onDeletePet={handleDeletePet}
+          onDeletePaciente={handleDeletePaciente}
           onDeleteAppointment={handleDeleteAppointment}
           deletingAppointmentId={deletingAppointmentId}
-          onSavePet={handleSavePet}
+          onSavePaciente={handleSavePaciente}
           onOpenConversation={handleOpenConversation}
           activeTab={activeTab}
           onTabChange={handleTabChange}
-          loadingPets={loadingPets}
+          loadingPets={loadingPacientes}
           loadingAppointments={loadingAppointments}
           loadingConversations={loadingConversations}
         />

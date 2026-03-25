@@ -11,7 +11,7 @@ export interface BoardingCheckOut {
 
 export interface BoardingStay {
   id: string
-  petshop_id: number
+  clinica_id: number
   client_id: string
   paciente_id: string
   service_type: string
@@ -29,7 +29,7 @@ export interface BoardingStay {
 
 export interface DailyLog {
   id: string
-  petshop_id: number
+  clinica_id: number
   stay_id: string
   log_date: string
   staff_name: string

@@ -8,7 +8,7 @@ import type {
   AestheticStats,
 } from '@/types'
 
-export function useAesthetics(petshopId: number) {
+export function useAesthetics(clinicaId: number) {
   const [services, setServices] = useState<AestheticService[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -19,7 +19,7 @@ export function useAesthetics(petshopId: number) {
         setLoading(true)
         setError(null)
         const data = await aestheticsService.getScheduledServices(
-          petshopId,
+          clinicaId,
           targetDate
         )
         setServices(data)
@@ -33,14 +33,14 @@ export function useAesthetics(petshopId: number) {
         setLoading(false)
       }
     },
-    [petshopId]
+    [clinicaId]
   )
 
   const fetchInProgressServices = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
-      const data = await aestheticsService.getInProgressServices(petshopId)
+      const data = await aestheticsService.getInProgressServices(clinicaId)
       setServices(data)
       return data
     } catch (err: any) {
@@ -51,7 +51,7 @@ export function useAesthetics(petshopId: number) {
     } finally {
       setLoading(false)
     }
-  }, [petshopId])
+  }, [clinicaId])
 
   const fetchCompletedServices = useCallback(
     async (startDate?: string, endDate?: string) => {
@@ -59,7 +59,7 @@ export function useAesthetics(petshopId: number) {
         setLoading(true)
         setError(null)
         const data = await aestheticsService.getCompletedServices(
-          petshopId,
+          clinicaId,
           startDate,
           endDate
         )
@@ -74,7 +74,7 @@ export function useAesthetics(petshopId: number) {
         setLoading(false)
       }
     },
-    [petshopId]
+    [clinicaId]
   )
 
   const createBooking = useCallback(
@@ -83,7 +83,7 @@ export function useAesthetics(petshopId: number) {
         setLoading(true)
         setError(null)
         const newBooking = await aestheticsService.createBooking(
-          petshopId,
+          clinicaId,
           bookingData
         )
         setServices((prev) => [newBooking, ...prev])
@@ -97,7 +97,7 @@ export function useAesthetics(petshopId: number) {
         setLoading(false)
       }
     },
-    [petshopId]
+    [clinicaId]
   )
 
   const checkIn = useCallback(
@@ -107,7 +107,7 @@ export function useAesthetics(petshopId: number) {
         setError(null)
         const updatedService = await aestheticsService.checkIn(
           bookingId,
-          petshopId,
+          clinicaId,
           checkInData
         )
         setServices((prev) =>
@@ -123,7 +123,7 @@ export function useAesthetics(petshopId: number) {
         setLoading(false)
       }
     },
-    [petshopId]
+    [clinicaId]
   )
 
   const startService = useCallback(
@@ -133,7 +133,7 @@ export function useAesthetics(petshopId: number) {
         setError(null)
         const updatedService = await aestheticsService.startService(
           bookingId,
-          petshopId
+          clinicaId
         )
         setServices((prev) =>
           prev.map((s) => (s.id === bookingId ? updatedService : s))
@@ -148,7 +148,7 @@ export function useAesthetics(petshopId: number) {
         setLoading(false)
       }
     },
-    [petshopId]
+    [clinicaId]
   )
 
   const completeService = useCallback(
@@ -158,7 +158,7 @@ export function useAesthetics(petshopId: number) {
         setError(null)
         const updatedService = await aestheticsService.completeService(
           bookingId,
-          petshopId,
+          clinicaId,
           completeData
         )
         setServices((prev) =>
@@ -174,7 +174,7 @@ export function useAesthetics(petshopId: number) {
         setLoading(false)
       }
     },
-    [petshopId]
+    [clinicaId]
   )
 
   const cancelBooking = useCallback(
@@ -184,7 +184,7 @@ export function useAesthetics(petshopId: number) {
         setError(null)
         const updatedService = await aestheticsService.cancelBooking(
           bookingId,
-          petshopId,
+          clinicaId,
           reason
         )
         setServices((prev) =>
@@ -200,7 +200,7 @@ export function useAesthetics(petshopId: number) {
         setLoading(false)
       }
     },
-    [petshopId]
+    [clinicaId]
   )
 
   return {
@@ -218,7 +218,7 @@ export function useAesthetics(petshopId: number) {
   }
 }
 
-export function useAestheticsStats(petshopId: number) {
+export function useAestheticsStats(clinicaId: number) {
   const [stats, setStats] = useState<AestheticStats | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -229,7 +229,7 @@ export function useAestheticsStats(petshopId: number) {
         setLoading(true)
         setError(null)
         const data = await aestheticsService.getStats(
-          petshopId,
+          clinicaId,
           startDate,
           endDate
         )
@@ -244,7 +244,7 @@ export function useAestheticsStats(petshopId: number) {
         setLoading(false)
       }
     },
-    [petshopId]
+    [clinicaId]
   )
 
   return {

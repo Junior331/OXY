@@ -103,7 +103,7 @@ export const clientService = {
     clinicaId?: number
   ): Promise<Paciente[]> {
     const response = await api.get<Paciente[]>(`/clients/${clientId}/pacientes`, {
-      params: clinicaId ? { petshop_id: clinicaId } : {},
+      params: clinicaId ? { clinica_id: clinicaId } : {},
     })
     return response.data
   },

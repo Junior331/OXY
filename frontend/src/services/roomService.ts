@@ -8,7 +8,7 @@ import type {
 
 export const roomService = {
   async listRooms(params?: {
-    petshop_id?: number
+    clinica_id?: number
     room_type?: 'hotel' | 'creche' | 'training'
     is_active?: boolean
   }): Promise<Room[]> {
@@ -47,7 +47,7 @@ export const roomService = {
     return response.data
   },
   async listAvailability(params: {
-    petshop_id: number
+    clinica_id: number
     check_in_date: string
     check_out_date?: string
     room_type?: 'hotel' | 'creche' | 'training'

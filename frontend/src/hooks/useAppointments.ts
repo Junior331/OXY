@@ -135,7 +135,7 @@ export function useAppointments() {
       service_ids: string[]
       preferred_date?: string
       preferred_time_range?: 'morning' | 'afternoon' | 'evening'
-      petshop_id?: number
+      clinica_id?: number
     }) => {
       try {
         setLoading(true)

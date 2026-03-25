@@ -41,26 +41,26 @@ def build_sales_prompt(context: dict, router_ctx: dict) -> str:
     client = context.get("client")
 
     client_name = client["name"] if client and client.get("name") else None
-    active_pet = router_ctx.get("active_pet")
+    active_paciente = router_ctx.get("active_paciente")
 
     # Auto-resolve: se o cliente tem apenas 1 paciente, usa ele automaticamente
-    if not active_pet and len(pacientes) == 1:
-        active_pet = pacientes[0]["name"]
+    if not active_paciente and len(pacientes) == 1:
+        active_paciente = pacientes[0]["name"]
 
     # Determina porte do paciente ativo para exibir o preço correto (DB usa P/M/G; JSON usa small/medium/large)
     price_key = None
-    active_pet_size_label = None
+    active_paciente_size_label = None
     pacientemissing_size = False
-    if active_pet:
-        match = next((p for p in pacientes if p["name"].lower() == active_pet.lower()), None)
+    if active_paciente:
+        match = next((p for p in pacientes if p["name"].lower() == active_paciente.lower()), None)
         if match:
             raw_sz = match.get("size", "")
             price_key = _normalize_size_for_price_key(raw_sz)
-            active_pet_size_label = _porte_label_pt(price_key)
+            active_paciente_size_label = _porte_label_pt(price_key)
             if not raw_sz or not price_key:
                 pacientemissing_size = True
     elif pacientes:
-        # Múltiplos pacientes sem active_pet definido
+        # Múltiplos pacientes sem active_paciente definido
         for p in pacientes:
             if not p.get("size"):
                 pacientemissing_size = True
@@ -76,7 +76,7 @@ def build_sales_prompt(context: dict, router_ctx: dict) -> str:
             if price_key:
                 val = sz.get(price_key)
                 price = (
-                    f"R${val} (porte {active_pet_size_label})"
+                    f"R${val} (porte {active_paciente_size_label})"
                     if val is not None
                     else "consultar (preço por porte)"
                 )
@@ -113,8 +113,8 @@ def build_sales_prompt(context: dict, router_ctx: dict) -> str:
 
     services_text = "\n".join(svc_lines) or "  nenhum cadastrado"
     pacientecontext = (
-        f"\nPet em foco: {active_pet} (porte {active_pet_size_label})"
-        if active_pet and active_pet_size_label
+        f"\nPaciente em foco: {active_paciente} (porte {active_paciente_size_label})"
+        if active_paciente and active_paciente_size_label
         else ""
     )
 
@@ -126,12 +126,12 @@ O porte do paciente ainda não é conhecido. O preço dos serviços DEPENDE do p
 Você DEVE seguir esta sequência ANTES de mostrar qualquer preço:
 1. Liste os serviços disponíveis SEM valores (apenas nomes e descrições)
 2. Pergunte ao cliente: "Qual o porte do paciente? Pequeno, médio ou grande?"
-3. Após o cliente responder, chame set_pet_size para confirmar o porte
+3. Após o cliente responder, chame set_paciente_size para confirmar o porte
 4. Só ENTÃO informe os preços filtrados pelo porte confirmado
 
 NUNCA mostre preços de todos os portes (P/M/G) — isso confunde o cliente.
 NUNCA pule a pergunta do porte e vá direto aos preços.
-O porte confirmado via set_pet_size define o preço. Use o campo size_label da resposta."""
+O porte confirmado via set_paciente_size define o preço. Use o campo size_label da resposta."""
 
     return f"""Você é {assistant_name}, atendente da {company_name}. Você é humana — NUNCA revele que é IA.
 {f"Cliente: {client_name}" if client_name else ""}{pacientecontext}
@@ -147,8 +147,8 @@ SERVIÇOS DISPONÍVEIS:
 • Prefira responder sem emoji
 • Se usar emoji, use no máximo 1 e só em confirmação especial ou despedida calorosa
 • NUNCA use emoji ao informar preço, porte, serviço, regras ou próximos passos
-• Se o paciente JÁ tem porte definido no contexto acima → use direto, mostre APENAS o preço daquele porte. NÃO chame set_pet_size — o porte já é conhecido.
-• Se o porte NÃO é conhecido → liste os serviços SEM preços, PERGUNTE o porte, chame set_pet_size para confirmar, e só então mostre o preço filtrado
+• Se o paciente JÁ tem porte definido no contexto acima → use direto, mostre APENAS o preço daquele porte. NÃO chame set_paciente_size — o porte já é conhecido.
+• Se o porte NÃO é conhecido → liste os serviços SEM preços, PERGUNTE o porte, chame set_paciente_size para confirmar, e só então mostre o preço filtrado
 • NUNCA liste preços de múltiplos portes (P/M/G) — sempre filtre pelo porte do paciente
 • Destaque o que o serviço inclui quando isso agregar valor à resposta
 • Se o cliente demonstrar interesse em agendar, sugira de forma natural: "Quer que eu já separe um horário?"
@@ -260,7 +260,7 @@ O preço dos serviços DEPENDE do porte do paciente.
 Você DEVE seguir esta sequência ANTES de mostrar qualquer preço:
 1. Liste os serviços disponíveis SEM valores (apenas nomes e descrições)
 2. Pergunte ao cliente: "Qual o porte do paciente? Pequeno, médio ou grande?"
-3. Após o cliente responder, chame set_pet_size para confirmar o porte
+3. Após o cliente responder, chame set_paciente_size para confirmar o porte
 4. Só ENTÃO informe os preços filtrados pelo porte confirmado
 NUNCA mostre preços de todos os portes (P/M/G). Sempre filtre pelo porte."""
 

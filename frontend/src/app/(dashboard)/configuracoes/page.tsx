@@ -510,7 +510,7 @@ function ServicosContent({
   specialties,
   loading,
   loadingSpecialties,
-  petshopId,
+  clinicaId,
   clinica,
   onEditService,
   onRefresh,
@@ -524,7 +524,7 @@ function ServicosContent({
   specialties: Specialty[];
   loading?: boolean;
   loadingSpecialties?: boolean;
-  petshopId: number;
+  clinicaId: number;
   clinica: Clinica | null;
   onEditService: (service: Service) => void;
   onRefresh: () => void;
@@ -2522,7 +2522,7 @@ function HospedagemContent() {
 
 export default function ConfiguracoesPage() {
   const { user, logout } = useAuthContext();
-  const petshopId = user?.petshop_id ?? 0;
+  const clinicaId = user?.clinica_id ?? 0;
   const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<SettingsTabId>("servicos");
@@ -2544,8 +2544,8 @@ export default function ConfiguracoesPage() {
       setGeneratingSlots(false);
     }
   }, [generateDays, toast]);
-  const [clinica, setPetshop] = useState<Clinica | null>(null);
-  const [petshopError, setPetshopError] = useState<string | null>(null);
+  const [clinica, setClinica] = useState<Clinica | null>(null);
+  const [clinicaError, setClinicaError] = useState<string | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [whatsappStatus, setWhatsappStatus] = useState<{
     status: string;
@@ -2558,7 +2558,7 @@ export default function ConfiguracoesPage() {
     total_payments?: number;
     average_ticket?: number;
   } | null>(null);
-  const [loadingPetshop, setLoadingPetshop] = useState(true);
+  const [loadingClinica, setLoadingClinica] = useState(true);
   const [loadingServices, setLoadingServices] = useState(true);
   const [loadingSpecialties, setLoadingSpecialties] = useState(false);
   const [loadingWhatsapp, setLoadingWhatsapp] = useState(true);
@@ -2601,16 +2601,16 @@ export default function ConfiguracoesPage() {
   });
   const [creatingService, setCreatingService] = useState(false);
 
-  const fetchPetshop = useCallback(async () => {
-    if (!petshopId) {
-      setLoadingPetshop(false);
-      setPetshopError(null);
+  const fetchClinica = useCallback(async () => {
+    if (!clinicaId) {
+      setLoadingClinica(false);
+      setClinicaError(null);
       return;
     }
-    setPetshopError(null);
+    setClinicaError(null);
     try {
-      const data = await clinicaService.getClinica(petshopId);
-      setPetshop(data);
+      const data = await clinicaService.getClinica(clinicaId);
+      setClinica(data);
     } catch (err: unknown) {
       console.error("Erro ao carregar estabelecimento:", err);
       const message =
@@ -2622,11 +2622,11 @@ export default function ConfiguracoesPage() {
           "string"
           ? (err.response as { data: { detail: string } }).data.detail
           : "Não foi possível carregar os dados do estabelecimento.";
-      setPetshopError(message);
+      setClinicaError(message);
     } finally {
-      setLoadingPetshop(false);
+      setLoadingClinica(false);
     }
-  }, [petshopId]);
+  }, [clinicaId]);
 
   const fetchServices = useCallback(async () => {
     try {
@@ -2639,7 +2639,7 @@ export default function ConfiguracoesPage() {
     } finally {
       setLoadingServices(false);
     }
-  }, [petshopId]);
+  }, [clinicaId]);
 
   const fetchSpecialties = useCallback(async () => {
     try {
@@ -2655,8 +2655,8 @@ export default function ConfiguracoesPage() {
   }, []);
 
   useEffect(() => {
-    fetchPetshop();
-  }, [fetchPetshop]);
+    fetchClinica();
+  }, [fetchClinica]);
 
   // Lazy-load: fetch data only when the relevant tab becomes active
   const servicesLoadedRef = useRef(false);
@@ -2730,14 +2730,14 @@ export default function ConfiguracoesPage() {
       owner_phone?: string;
       emergency_contact?: string;
     }) => {
-      if (!petshopId) return;
+      if (!clinicaId) return;
       try {
         const { name: company_name, ...clinicaData } = data;
-        await clinicaService.updateClinica(petshopId, {
+        await clinicaService.updateClinica(clinicaId, {
           ...clinicaData,
           ...(company_name ? { company_name } : {}),
         } as Parameters<typeof clinicaService.updateClinica>[1]);
-        await fetchPetshop();
+        await fetchClinica();
         toast.success(
           "Configurações salvas!",
           "As informações da empresa foram atualizadas com sucesso.",
@@ -2750,7 +2750,7 @@ export default function ConfiguracoesPage() {
         );
       }
     },
-    [petshopId, fetchPetshop, toast],
+    [clinicaId, fetchClinica, toast],
   );
 
   const handleEditService = (service: Service) => {
@@ -3004,7 +3004,7 @@ export default function ConfiguracoesPage() {
             specialties={specialties}
             loading={loadingServices}
             loadingSpecialties={loadingSpecialties}
-            petshopId={petshopId}
+            clinicaId={clinicaId}
             clinica={clinica}
             onEditService={handleEditService}
             onRefresh={fetchServices}
@@ -3023,7 +3023,7 @@ export default function ConfiguracoesPage() {
         return (
           <EmpresaContent
             clinica={clinica}
-            loading={loadingPetshop}
+            loading={loadingClinica}
             onSave={handleSaveEmpresa}
           />
         );
@@ -3062,8 +3062,8 @@ export default function ConfiguracoesPage() {
               <SettingsProfileSidebar
                 clinica={clinica}
                 user={user}
-                loading={loadingPetshop}
-                error={petshopError}
+                loading={loadingClinica}
+                error={clinicaError}
                 showNovoServico={false}
                 onNovoServico={handleOpenNewServiceModal}
                 onLogout={logout}

@@ -17,7 +17,7 @@ def build_lodging_agent(context: dict, router_ctx: dict) -> Agent:
 
     checkin_mentioned = router_ctx.get("checkin_mentioned")
     checkout_mentioned = router_ctx.get("checkout_mentioned")
-    active_pet = router_ctx.get("active_pet")
+    active_paciente = router_ctx.get("active_paciente")
 
     type_label = "Hotel" if lodging_type == "hotel" else "Creche"
     type_ctx = f"\nTipo de hospedagem: {type_label}"
@@ -27,8 +27,8 @@ def build_lodging_agent(context: dict, router_ctx: dict) -> Agent:
         date_ctx += f"\nCheck-in mencionado: {checkin_mentioned}"
     if checkout_mentioned:
         date_ctx += f"\nCheck-out mencionado: {checkout_mentioned}"
-    if active_pet:
-        date_ctx += f"\nPet em foco: {active_pet}"
+    if active_paciente:
+        date_ctx += f"\nPaciente em foco: {active_paciente}"
 
     instructions = f"""Você é {assistant_name}, assistente de hospedagem de {company_name}.
 
@@ -36,7 +36,7 @@ Sua responsabilidade: gerenciar hospedagens (hotel e creche para pacientes).
 {type_ctx}{date_ctx}
 
 FLUXO DE HOSPEDAGEM:
-1. Confirme o paciente (use get_client_pets — verifique se está cadastrado)
+1. Confirme o paciente (use get_client_pacientes — verifique se está cadastrado)
 2. Pergunte datas de check-in e check-out (se não informadas)
 3. Chame get_kennel_availability — a resposta já traz o valor diário (daily_rate), total e vagas disponíveis
 4. Apresente o resumo ao cliente com o campo "message" da tool. Na creche, use também "last_day_client" e

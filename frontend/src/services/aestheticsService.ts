@@ -20,7 +20,7 @@ export const aestheticsService = {
       '/aesthetics/book',
       bookingData,
       {
-        params: { petshop_id: clinicaId },
+        params: { clinica_id: clinicaId },
       }
     )
     return response.data
@@ -35,7 +35,7 @@ export const aestheticsService = {
       '/aesthetics/scheduled',
       {
         params: {
-          petshop_id: clinicaId,
+          clinica_id: clinicaId,
           ...(targetDate && { target_date: targetDate }),
         },
       }
@@ -50,7 +50,7 @@ export const aestheticsService = {
     const response = await api.get<AestheticService[]>(
       '/aesthetics/in-progress',
       {
-        params: { petshop_id: clinicaId },
+        params: { clinica_id: clinicaId },
       }
     )
     return response.data
@@ -66,7 +66,7 @@ export const aestheticsService = {
       '/aesthetics/completed',
       {
         params: {
-          petshop_id: clinicaId,
+          clinica_id: clinicaId,
           ...(startDate && { start_date: startDate }),
           ...(endDate && { end_date: endDate }),
         },
@@ -85,7 +85,7 @@ export const aestheticsService = {
       `/aesthetics/${bookingId}/check-in`,
       checkInData,
       {
-        params: { petshop_id: clinicaId },
+        params: { clinica_id: clinicaId },
       }
     )
     return response.data
@@ -100,7 +100,7 @@ export const aestheticsService = {
       `/aesthetics/${bookingId}/start`,
       {},
       {
-        params: { petshop_id: clinicaId },
+        params: { clinica_id: clinicaId },
       }
     )
     return response.data
@@ -116,7 +116,7 @@ export const aestheticsService = {
       `/aesthetics/${bookingId}/complete`,
       completeData,
       {
-        params: { petshop_id: clinicaId },
+        params: { clinica_id: clinicaId },
       }
     )
     return response.data
@@ -132,7 +132,7 @@ export const aestheticsService = {
       `/aesthetics/${bookingId}/cancel`,
       { reason },
       {
-        params: { petshop_id: clinicaId },
+        params: { clinica_id: clinicaId },
       }
     )
     return response.data
@@ -146,7 +146,7 @@ export const aestheticsService = {
     // TODO: Backend — endpoint não implementado em api-node ainda. Implementar em backend/api-node/src/modules/
     const response = await api.get<AestheticStats>('/aesthetics/stats', {
       params: {
-        petshop_id: clinicaId,
+        clinica_id: clinicaId,
         ...(startDate && { start_date: startDate }),
         ...(endDate && { end_date: endDate }),
       },

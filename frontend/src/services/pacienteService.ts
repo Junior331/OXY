@@ -69,7 +69,7 @@ export const pacienteService = {
   async createPaciente(pacienteData: PacienteCreate): Promise<Paciente> {
     const { clinica_id, ...body } = pacienteData
     const response = await api.post<Paciente>('/pacientes', body, {
-      params: { petshop_id: clinica_id },
+      params: { clinica_id },
     })
     return response.data
   },
@@ -82,7 +82,7 @@ export const pacienteService = {
   },
   async getClientPacientes(clientId: string, clinicaId?: number): Promise<Paciente[]> {
     const response = await api.get<Paciente[]>(`/clients/${clientId}/pacientes`, {
-      params: clinicaId ? { petshop_id: clinicaId } : {},
+      params: clinicaId ? { clinica_id: clinicaId } : {},
     })
     return response.data
   },

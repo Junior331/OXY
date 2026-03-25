@@ -1,13 +1,13 @@
 import { Router } from 'express'
 import { verifyToken } from '../../middleware/authMiddleware'
 import {
-  listPets,
-  getPet,
-  createPet,
-  updatePet,
-  deletePet,
-  getClientPets,
-} from './pacienteontroller'
+  listPacientes,
+  getPaciente,
+  createPaciente,
+  updatePaciente,
+  deletePaciente,
+  getClientPacientes,
+} from './pacienteController'
 
 const router = Router()
 
@@ -15,22 +15,22 @@ const router = Router()
 router.use(verifyToken)
 
 // GET /pacientes - List all pacientes
-router.get('/', listPets)
+router.get('/', listPacientes)
 
-// GET /pacientes/client/:clientId/pacientes - Get pacientes for a client (DEVE VIR ANTES DE :paciented)
-router.get('/client/:clientId/pacientes', getClientPets)
+// GET /pacientes/client/:clientId/pacientes - Get pacientes for a client (DEVE VIR ANTES DE :pacienteId)
+router.get('/client/:clientId/pacientes', getClientPacientes)
 
 // POST /pacientes - Create new paciente
-router.post('/', createPet)
+router.post('/', createPaciente)
 
-// GET /pacientes/:paciented - Get paciente details (rotas genéricas após específicas)
-router.get('/:paciented', getPet)
+// GET /pacientes/:pacienteId - Get paciente details (rotas genéricas após específicas)
+router.get('/:pacienteId', getPaciente)
 
-// PUT /pacientes/:paciented - Update paciente
-router.put('/:paciented', updatePet)
+// PUT /pacientes/:pacienteId - Update paciente
+router.put('/:pacienteId', updatePaciente)
 
-// DELETE /pacientes/:paciented - Delete paciente
-router.delete('/:paciented', deletePet)
+// DELETE /pacientes/:pacienteId - Delete paciente
+router.delete('/:pacienteId', deletePaciente)
 
 export default router
 

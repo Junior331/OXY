@@ -54,7 +54,7 @@ export interface PreAssessment {
 
 export interface AestheticService {
   id: string
-  petshop_id: number
+  clinica_id: number
   client_id: string
   paciente_id: string
   check_in_at: string

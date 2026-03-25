@@ -13,11 +13,11 @@ def build_faq_agent(context: dict, router_ctx: dict) -> Agent:
 
     get_services = build_booking_tools(company_id, client_id)[0]
     client_tools = build_client_tools(company_id, client_id)
-    set_pet_size = client_tools[2]
+    set_paciente_size = client_tools[2]
 
     return Agent(
         name="FAQ Agent",
         model=OpenAIChat(id=OPENAI_MODEL),
         instructions=build_faq_prompt(context, router_ctx),
-        tools=[search_knowledge_base, get_services, set_pet_size],
+        tools=[search_knowledge_base, get_services, set_paciente_size],
     )

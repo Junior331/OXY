@@ -103,7 +103,7 @@ export const TOOLS = [
   {
     type: 'function',
     function: {
-      name: 'get_pet_birthdays',
+      name: 'get_paciente_birthdays',
       description: 'Retorna pacientes que fazem aniversário em breve.',
       parameters: {
         type: 'object',
@@ -370,11 +370,11 @@ export async function executeTool(name: string, args: any, companyId: number): P
         ).join('\n')
     }
 
-    case 'get_pet_birthdays': {
+    case 'get_paciente_birthdays': {
       const days = args.days ?? 7
       try {
         const data = await prisma.$queryRaw<Array<{ pacientename: string; client_name: string; birth_date: string; days_until: number }>>`
-          SELECT * FROM get_pet_birthdays_next_days(${companyId}, ${days})
+          SELECT * FROM get_paciente_birthdays_next_days(${companyId}, ${days})
         `
         if (!data || data.length === 0) return `Nenhum paciente faz aniversário nos próximos ${days} dias.`
         return `${data.length} paciente(s) fazem aniversário nos próximos ${days} dias:\n` +

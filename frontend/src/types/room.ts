@@ -1,6 +1,6 @@
 export interface Room {
   id: string
-  petshop_id: number
+  clinica_id: number
   name: string
   room_type: 'hotel' | 'creche' | 'training'
   capacity: number
@@ -12,7 +12,7 @@ export interface Room {
 }
 
 export interface RoomCreate {
-  petshop_id: number
+  clinica_id: number
   name: string
   room_type: 'hotel' | 'creche' | 'training'
   capacity: number

@@ -201,7 +201,7 @@ def build_lodging_tools(company_id: int, client_id, lodging_type: str = "hotel")
         Cria uma reserva de hospedagem. Exige confirmed=True — nunca criar sem confirmação explícita do cliente.
 
         Args:
-            pacienteid: ID do paciente (obtido via get_client_pets)
+            pacienteid: ID do paciente (obtido via get_client_pacientes)
             checkin_date: Data de entrada YYYY-MM-DD
             checkout_date: Data de saída YYYY-MM-DD
             daily_rate: Valor diário — opcional
@@ -219,7 +219,7 @@ def build_lodging_tools(company_id: int, client_id, lodging_type: str = "hotel")
                 "success": False,
                 "message": (
                     f"pacienteid inválido: '{pacienteid}' não é um UUID. "
-                    "Chame get_client_pets para obter o ID correto do paciente antes de criar a hospedagem."
+                    "Chame get_client_pacientes para obter o ID correto do paciente antes de criar a hospedagem."
                 ),
             }
 
@@ -274,7 +274,7 @@ def build_lodging_tools(company_id: int, client_id, lodging_type: str = "hotel")
             )
             paciente = cur.fetchone()
             if not paciente:
-                return {"success": False, "message": "Paciente não encontrado. Use get_client_pets para obter os IDs corretos."}
+                return {"success": False, "message": "Paciente não encontrado. Use get_client_pacientes para obter os IDs corretos."}
 
             cur.execute("""
                 INSERT INTO clinica_lodging_reservations

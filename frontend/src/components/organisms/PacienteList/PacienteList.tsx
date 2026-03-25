@@ -11,51 +11,51 @@ import type { PacienteCreate, PacienteUpdate } from '@/services/pacienteService'
 export interface PacienteListProps {
   pacientes: Paciente[]
   clientId: string
-  petshopId: number
+  clinicaId: number
   isLoading?: boolean
-  onCreatePet: (data: PacienteCreate) => Promise<void>
-  onUpdatePet: (pacienteId: string, data: PacienteUpdate) => Promise<void>
-  onDeletePet: (pacienteId: string) => Promise<void>
+  onCreatePaciente: (data: PacienteCreate) => Promise<void>
+  onUpdatePaciente: (pacienteId: string, data: PacienteUpdate) => Promise<void>
+  onDeletePaciente: (pacienteId: string) => Promise<void>
 }
 
 export function PacienteList({
   pacientes,
   clientId,
-  petshopId,
+  clinicaId,
   isLoading = false,
-  onCreatePet,
-  onUpdatePet,
-  onDeletePet,
+  onCreatePaciente,
+  onUpdatePaciente,
+  onDeletePaciente,
 }: PacienteListProps) {
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [editingPet, setEditingPet] = useState<Paciente | null>(null)
-  const [deletingPet, setDeletingPet] = useState<Paciente | null>(null)
+  const [editingPaciente, setEditingPaciente] = useState<Paciente | null>(null)
+  const [deletingPaciente, setDeletingPaciente] = useState<Paciente | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
   const handleEdit = (paciente: Paciente) => {
-    setEditingPet(paciente)
+    setEditingPaciente(paciente)
     setIsFormOpen(true)
   }
 
   const handleDelete = (paciente: Paciente) => {
-    setDeletingPet(paciente)
+    setDeletingPaciente(paciente)
   }
 
   const handleSubmit = async (data: PacienteCreate | PacienteUpdate) => {
-    if (editingPet) {
-      await onUpdatePet(editingPet.id, data as PacienteUpdate)
+    if (editingPaciente) {
+      await onUpdatePaciente(editingPaciente.id, data as PacienteUpdate)
     } else {
-      await onCreatePet(data as PacienteCreate)
+      await onCreatePaciente(data as PacienteCreate)
     }
-    setEditingPet(null)
+    setEditingPaciente(null)
   }
 
   const confirmDelete = async () => {
-    if (!deletingPet) return
+    if (!deletingPaciente) return
     setIsDeleting(true)
     try {
-      await onDeletePet(deletingPet.id)
-      setDeletingPet(null)
+      await onDeletePaciente(deletingPaciente.id)
+      setDeletingPaciente(null)
     } catch (error) {
       console.error('Erro ao excluir paciente:', error)
     } finally {
@@ -65,7 +65,7 @@ export function PacienteList({
 
   const handleCloseForm = () => {
     setIsFormOpen(false)
-    setEditingPet(null)
+    setEditingPaciente(null)
   }
 
   if (isLoading) {
@@ -124,15 +124,15 @@ export function PacienteList({
         isOpen={isFormOpen}
         onClose={handleCloseForm}
         onSubmit={handleSubmit}
-        paciente={editingPet}
+        paciente={editingPaciente}
         clientId={clientId}
-        petshopId={petshopId}
+        clinicaId={clinicaId}
       />
 
       {}
       <Modal
-        isOpen={!!deletingPet}
-        onClose={() => setDeletingPet(null)}
+        isOpen={!!deletingPaciente}
+        onClose={() => setDeletingPaciente(null)}
         title="Excluir Paciente"
         onSubmit={confirmDelete}
         submitText="Excluir"
@@ -140,7 +140,7 @@ export function PacienteList({
         className="sm:max-w-md"
       >
         <p className="text-[#727B8E] dark:text-[#8a94a6]">
-          Tem certeza que deseja excluir <strong className="text-[#434A57] dark:text-[#f5f9fc]">{deletingPet?.name}</strong>?
+          Tem certeza que deseja excluir <strong className="text-[#434A57] dark:text-[#f5f9fc]">{deletingPaciente?.name}</strong>?
           Esta ação não pode ser desfeita.
         </p>
       </Modal>

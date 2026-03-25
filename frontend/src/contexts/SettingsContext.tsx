@@ -5,7 +5,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-import { petshopService, serviceService } from "@/services";
+import { clinicaService, serviceService } from "@/services";
 import type { Clinica, Service } from "@/types";
 
 interface SettingsContextType {
@@ -17,21 +17,21 @@ interface SettingsContextType {
   customCapacityHours: Record<string, unknown> | null;
 
   // Loading states
-  loadingPetshop: boolean;
+  loadingClinica: boolean;
   loadingServices: boolean;
 
   // Error states
-  petshopError: string | null;
+  clinicaError: string | null;
   servicesError: string | null;
 
   // Mutations
-  updatePetshop: (data: any) => Promise<void>;
+  updateClinica: (data: any) => Promise<void>;
   createService: (data: any) => Promise<Service>;
   updateService: (id: number, data: any) => Promise<Service>;
   deleteService: (id: number) => Promise<void>;
 
   // Refresh
-  refetchPetshop: () => Promise<void>;
+  refetchClinica: () => Promise<void>;
   refetchServices: () => Promise<void>;
 }
 
@@ -41,41 +41,41 @@ export const SettingsContext = createContext<SettingsContextType | undefined>(
 
 export function SettingsProvider({
   children,
-  petshopId,
+  clinicaId,
 }: {
   children: React.ReactNode;
-  petshopId: number;
+  clinicaId: number;
 }) {
   // State
-  const [clinica, setPetshop] = useState<Clinica | null>(null);
+  const [clinica, setClinica] = useState<Clinica | null>(null);
   const [services, setServices] = useState<Service[]>([]);
-  const [loadingPetshop, setLoadingPetshop] = useState(true);
+  const [loadingClinica, setLoadingClinica] = useState(true);
   const [loadingServices, setLoadingServices] = useState(true);
-  const [petshopError, setPetshopError] = useState<string | null>(null);
+  const [clinicaError, setClinicaError] = useState<string | null>(null);
   const [servicesError, setServicesError] = useState<string | null>(null);
 
   // Fetch clinica (com cache)
-  const refetchPetshop = useCallback(async () => {
-    if (!petshopId) {
-      setLoadingPetshop(false);
+  const refetchClinica = useCallback(async () => {
+    if (!clinicaId) {
+      setLoadingClinica(false);
       return;
     }
 
     try {
-      setPetshopError(null);
-      const data = await clinicaService.getClinica(petshopId);
-      setPetshop(data);
+      setClinicaError(null);
+      const data = await clinicaService.getClinica(clinicaId);
+      setClinica(data);
     } catch (error: any) {
       console.error("Erro ao carregar clinica:", error);
-      setPetshopError(error?.message || "Erro ao carregar dados do clinica");
+      setClinicaError(error?.message || "Erro ao carregar dados da clínica");
     } finally {
-      setLoadingPetshop(false);
+      setLoadingClinica(false);
     }
-  }, [petshopId]);
+  }, [clinicaId]);
 
   // Fetch services (com cache)
   const refetchServices = useCallback(async () => {
-    if (!petshopId) {
+    if (!clinicaId) {
       setLoadingServices(false);
       return;
     }
@@ -90,30 +90,30 @@ export function SettingsProvider({
     } finally {
       setLoadingServices(false);
     }
-  }, [petshopId]);
+  }, [clinicaId]);
 
   // Load data on mount
   useEffect(() => {
-    refetchPetshop();
-  }, [refetchPetshop]);
+    refetchClinica();
+  }, [refetchClinica]);
 
   useEffect(() => {
     refetchServices();
   }, [refetchServices]);
 
   // Mutations
-  const updatePetshop = useCallback(
+  const updateClinica = useCallback(
     async (data: any) => {
-      if (!petshopId) throw new Error("Clinica ID not found");
+      if (!clinicaId) throw new Error("Clinica ID not found");
 
       try {
-        await clinicaService.updateClinica(petshopId, data);
-        await refetchPetshop();
+        await clinicaService.updateClinica(clinicaId, data);
+        await refetchClinica();
       } catch (error) {
         throw error;
       }
     },
-    [petshopId, refetchPetshop],
+    [clinicaId, refetchClinica],
   );
 
   const createService = useCallback(async (data: any) => {
@@ -152,29 +152,29 @@ export function SettingsProvider({
       businessHours: clinica?.businessHours || null,
       defaultCapacityPerHour: (clinica as any)?.defaultCapacityPerHour || null,
       customCapacityHours: (clinica as any)?.customCapacityHours || null,
-      loadingPetshop,
+      loadingClinica,
       loadingServices,
-      petshopError,
+      clinicaError,
       servicesError,
-      updatePetshop,
+      updateClinica,
       createService,
       updateService,
       deleteService,
-      refetchPetshop,
+      refetchClinica,
       refetchServices,
     }),
     [
       clinica,
       services,
-      loadingPetshop,
+      loadingClinica,
       loadingServices,
-      petshopError,
+      clinicaError,
       servicesError,
-      updatePetshop,
+      updateClinica,
       createService,
       updateService,
       deleteService,
-      refetchPetshop,
+      refetchClinica,
       refetchServices,
     ],
   );

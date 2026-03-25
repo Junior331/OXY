@@ -1,7 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from '../../lib/prisma'
 
-const PET_SIZE_LOOKUP: Record<string, string> = {
+const PACIENTE_SIZE_LOOKUP: Record<string, string> = {
   // Canonical (pass-through)
   p: 'P', m: 'M', g: 'G', gg: 'GG',
   // English
@@ -11,9 +11,9 @@ const PET_SIZE_LOOKUP: Record<string, string> = {
   pequeno: 'P', médio: 'M', medio: 'M', grande: 'G',
 }
 
-function normalizePetSize(size: unknown): string | undefined {
+function normalizePacienteSize(size: unknown): string | undefined {
   if (typeof size !== 'string') return undefined
-  const code = PET_SIZE_LOOKUP[size.toLowerCase().trim()]
+  const code = PACIENTE_SIZE_LOOKUP[size.toLowerCase().trim()]
   return code ?? (size.trim() || undefined)
 }
 
@@ -62,7 +62,7 @@ function parseWeightKg(value: unknown): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
-function extractPetNotes(notes: unknown, medicalInfo: unknown): string | null | undefined {
+function extractPacienteNotes(notes: unknown, medicalInfo: unknown): string | null | undefined {
   if (notes === null) return null
   if (typeof notes === 'string') {
     const normalized = notes.trim()
@@ -101,7 +101,7 @@ function extractPetNotes(notes: unknown, medicalInfo: unknown): string | null | 
   return undefined
 }
 
-function buildPetPayload(body: Record<string, unknown>) {
+function buildPacientePayload(body: Record<string, unknown>) {
   const data: Record<string, unknown> = {}
 
   if (body.name !== undefined) data.name = body.name
@@ -115,10 +115,10 @@ function buildPetPayload(body: Record<string, unknown>) {
   const weightKg = parseWeightKg(body.weightKg ?? body.weight_kg ?? body.weight)
   if (weightKg !== undefined) data.weightKg = weightKg
 
-  const size = normalizePetSize(body.size)
+  const size = normalizePacienteSize(body.size)
   if (size !== undefined) data.size = size
 
-  const notes = extractPetNotes(body.notes, body.medical_info)
+  const notes = extractPacienteNotes(body.notes, body.medical_info)
   if (notes !== undefined) data.notes = notes
 
   if (body.isActive !== undefined) data.isActive = Boolean(body.isActive)
@@ -127,7 +127,7 @@ function buildPetPayload(body: Record<string, unknown>) {
   return data
 }
 
-function shapePet(paciente: any) {
+function shapePaciente(paciente: any) {
   const birthDate = paciente.birthDate
     ? new Date(paciente.birthDate).toISOString().slice(0, 10)
     : null
@@ -148,7 +148,7 @@ function shapePet(paciente: any) {
 }
 
 // GET /pacientes - List all pacientes for the company
-export async function listPets(req: Request, res: Response) {
+export async function listPacientes(req: Request, res: Response) {
   try {
     const companyId = req.user!.companyId
     const { client_id, species, limit = 50, offset = 0 } = req.query
@@ -173,21 +173,21 @@ export async function listPets(req: Request, res: Response) {
       orderBy: { createdAt: 'desc' },
     })
 
-    res.json(pacientes.map((paciente) => ({ ...shapePet(paciente), client: paciente.client })))
+    res.json(pacientes.map((paciente) => ({ ...shapePaciente(paciente), client: paciente.client })))
   } catch (error) {
     console.error('Error listing pacientes:', error)
     res.status(500).json({ error: 'Failed to list pacientes' })
   }
 }
 
-// GET /pacientes/:paciented - Get paciente details
-export async function getPet(req: Request, res: Response) {
+// GET /pacientes/:pacienteId - Get paciente details
+export async function getPaciente(req: Request, res: Response) {
   try {
     const companyId = req.user!.companyId
-    const paciented = req.params.paciented!
+    const pacienteId = req.params.pacienteId!
 
     const paciente = await prisma.clinicaPaciente.findUnique({
-      where: { id: paciented },
+      where: { id: pacienteId },
       include: {
         client: true,
         appointments: {
@@ -202,7 +202,7 @@ export async function getPet(req: Request, res: Response) {
     }
 
     res.json({
-      ...shapePet(paciente),
+      ...shapePaciente(paciente),
       client: paciente.client,
       appointments: paciente.appointments,
     })
@@ -213,7 +213,7 @@ export async function getPet(req: Request, res: Response) {
 }
 
 // POST /pacientes - Create a new paciente
-export async function createPet(req: Request, res: Response) {
+export async function createPaciente(req: Request, res: Response) {
   try {
     const companyId = req.user!.companyId
     const { client_id, name } = req.body
@@ -236,26 +236,26 @@ export async function createPet(req: Request, res: Response) {
         companyId,
         clientId: client_id as string,
         name,
-        ...buildPetPayload(req.body),
+        ...buildPacientePayload(req.body),
       },
     })
 
-    res.status(201).json(shapePet(paciente))
+    res.status(201).json(shapePaciente(paciente))
   } catch (error) {
     console.error('Error creating paciente:', error)
     res.status(500).json({ error: 'Failed to create paciente' })
   }
 }
 
-// PUT /pacientes/:paciented - Update paciente
-export async function updatePet(req: Request, res: Response) {
+// PUT /pacientes/:pacienteId - Update paciente
+export async function updatePaciente(req: Request, res: Response) {
   try {
     const companyId = req.user!.companyId
-    const paciented = req.params.paciented!
-    const updateData = buildPetPayload(req.body)
+    const pacienteId = req.params.pacienteId!
+    const updateData = buildPacientePayload(req.body)
 
     const existing = await prisma.clinicaPaciente.findUnique({
-      where: { id: paciented },
+      where: { id: pacienteId },
     })
 
     if (!existing || existing.companyId !== companyId) {
@@ -263,25 +263,25 @@ export async function updatePet(req: Request, res: Response) {
     }
 
     const paciente = await prisma.clinicaPaciente.update({
-      where: { id: paciented },
+      where: { id: pacienteId },
       data: updateData,
     })
 
-    res.json(shapePet(paciente))
+    res.json(shapePaciente(paciente))
   } catch (error) {
     console.error('Error updating paciente:', error)
     res.status(500).json({ error: 'Failed to update paciente' })
   }
 }
 
-// DELETE /pacientes/:paciented - Delete paciente
-export async function deletePet(req: Request, res: Response) {
+// DELETE /pacientes/:pacienteId - Delete paciente
+export async function deletePaciente(req: Request, res: Response) {
   try {
     const companyId = req.user!.companyId
-    const paciented = req.params.paciented!
+    const pacienteId = req.params.pacienteId!
 
     const existing = await prisma.clinicaPaciente.findUnique({
-      where: { id: paciented },
+      where: { id: pacienteId },
     })
 
     if (!existing || existing.companyId !== companyId) {
@@ -289,7 +289,7 @@ export async function deletePet(req: Request, res: Response) {
     }
 
     await prisma.clinicaPaciente.delete({
-      where: { id: paciented },
+      where: { id: pacienteId },
     })
 
     res.json({ success: true, message: 'Paciente deleted' })
@@ -300,7 +300,7 @@ export async function deletePet(req: Request, res: Response) {
 }
 
 // GET /clients/:clientId/pacientes - Get pacientes for a specific client
-export async function getClientPets(req: Request, res: Response) {
+export async function getClientPacientes(req: Request, res: Response) {
   try {
     const companyId = req.user!.companyId
     const clientId = req.params.clientId!
@@ -322,7 +322,7 @@ export async function getClientPets(req: Request, res: Response) {
       orderBy: { createdAt: 'desc' },
     })
 
-    res.json(pacientes.map(shapePet))
+    res.json(pacientes.map(shapePaciente))
   } catch (error) {
     console.error('Error getting client pacientes:', error)
     res.status(500).json({ error: 'Failed to get client pacientes' })

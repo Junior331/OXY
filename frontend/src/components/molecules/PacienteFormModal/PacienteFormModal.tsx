@@ -6,7 +6,7 @@ import { Select } from '@/components/atoms/Select'
 import { TextArea } from '@/components/atoms/TextArea'
 import { Input } from '@/components/atoms/Input'
 import { maskDate, dateToISO, dateFromISO } from '@/lib/masks'
-import { PACIENTE_SIZE_OPTIONS_WITH_PLACEHOLDER, normalizePetSize } from '@/lib/pacienteSize'
+import { PACIENTE_SIZE_OPTIONS_WITH_PLACEHOLDER, normalizePacienteSize } from '@/lib/pacienteSize'
 import type { Paciente } from '@/types'
 import type { PacienteCreate, PacienteUpdate } from '@/services/pacienteService'
 
@@ -16,7 +16,7 @@ export interface PacienteFormModalProps {
   onSubmit: (data: PacienteCreate | PacienteUpdate) => Promise<void>
   paciente?: Paciente | null
   clientId: string
-  petshopId: number
+  clinicaId: number
 }
 
 interface PacienteFormData {
@@ -52,7 +52,7 @@ export function PacienteFormModal({
   onSubmit,
   paciente,
   clientId,
-  petshopId,
+  clinicaId,
 }: PacienteFormModalProps) {
   const [isLoading, setIsLoading] = useState(false)
   const isEditing = !!paciente
@@ -85,7 +85,7 @@ export function PacienteFormModal({
         species: paciente.species || '',
         breed: paciente.breed || '',
         age: paciente.age?.toString() || '',
-        size: normalizePetSize(paciente.size) ?? '',
+        size: normalizePacienteSize(paciente.size) ?? '',
         weight: paciente.weight?.toString() || '',
         color: paciente.color || '',
         medical_info: (typeof paciente.medical_info === 'string' ? paciente.medical_info : '') || '',
@@ -118,7 +118,7 @@ export function PacienteFormModal({
       const lastVetISO = data.last_vet_visit ? dateToISO(data.last_vet_visit) : undefined
 
       const payload: PacienteCreate | PacienteUpdate = {
-        ...(isEditing ? {} : { petshop_id: petshopId, client_id: clientId }),
+        ...(isEditing ? {} : { clinica_id: clinicaId, client_id: clientId }),
         name: data.name,
         species: data.species || undefined,
         breed: data.breed || undefined,

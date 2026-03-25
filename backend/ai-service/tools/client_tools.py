@@ -71,7 +71,7 @@ def build_client_tools(company_id: int, client_id: str) -> list:
     A LLM nunca recebe os IDs como parâmetro — ela só preenche o que realmente importa.
     """
 
-    def get_client_pets() -> dict:
+    def get_client_pacientes() -> dict:
         """
         Lista os pacientes ativos do cliente.
         Chamar SEMPRE antes de cadastrar um paciente para evitar duplicatas.
@@ -90,7 +90,7 @@ def build_client_tools(company_id: int, client_id: str) -> list:
             pacientes = cur.fetchall()
         return {"pacientes": [dict(p) for p in pacientes], "count": len(pacientes)}
 
-    def create_pet(name: str, species: str, breed: str, size: str) -> dict:
+    def create_paciente(name: str, species: str, breed: str, size: str) -> dict:
         """
         Cadastra um novo paciente para o cliente.
         TODOS os 4 campos são OBRIGATÓRIOS — incluindo o porte.
@@ -234,19 +234,19 @@ def build_client_tools(company_id: int, client_id: str) -> list:
             "message": f"{name} cadastrado com sucesso!",
         }
 
-    def set_pet_size(pacientename: str, size: str) -> dict:
+    def set_paciente_size(pacientename: str, size: str) -> dict:
         """
         Confirma e registra o porte do paciente informado pelo cliente.
         Use esta tool SEMPRE que o cliente informar o porte — tanto para pacientes já cadastrados quanto para pacientes ainda não cadastrados.
 
         - Se o paciente já existe no banco → atualiza o porte
-        - Se o paciente ainda não foi cadastrado → retorna o porte confirmado para uso em create_pet e nos preços
+        - Se o paciente ainda não foi cadastrado → retorna o porte confirmado para uso em create_paciente e nos preços
 
         O porte confirmado por esta tool define o preço dos serviços.
         NUNCA deduza o porte pela raça — sempre pergunte ao cliente primeiro.
 
         Args:
-            pacientename: Nome/apelido do paciente (NÃO use raça como nome — veja instruções em create_pet)
+            pacientename: Nome/apelido do paciente (NÃO use raça como nome — veja instruções em create_paciente)
             size: Porte informado pelo cliente — 'P', 'M', 'G' ou 'GG'
         """
         if not size or not size.strip():
@@ -391,9 +391,9 @@ def build_client_tools(company_id: int, client_id: str) -> list:
         return _merge_upcoming_appointment_rows(rows)
 
     return [
-        get_client_pets,
-        create_pet,
-        set_pet_size,
+        get_client_pacientes,
+        create_paciente,
+        set_paciente_size,
         advance_stage,
         get_upcoming_appointments,
     ]

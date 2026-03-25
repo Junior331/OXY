@@ -28,7 +28,7 @@ export const CustomStats: Story = {
   },
 }
 
-export const PetshopStats: Story = {
+export const ClinicaStats: Story = {
   args: {
     stats: [
       { label: 'Banhos hoje', value: '8' },

@@ -36,14 +36,14 @@ const SIZE_LOOKUP: Record<string, PacienteSizeCode> = {
 };
 
 /** Returns the canonical code or `undefined` if unknown. */
-export function normalizePetSize(size?: string | null): PacienteSizeCode | undefined {
+export function normalizePacienteSize(size?: string | null): PacienteSizeCode | undefined {
   if (!size) return undefined;
   return SIZE_LOOKUP[size.toLowerCase().trim()];
 }
 
 /** Display label for any size format. */
 export function pacienteSizeLabel(size?: string | null): string {
-  switch (normalizePetSize(size)) {
+  switch (normalizePacienteSize(size)) {
     case "P":
       return "Pequeno";
     case "M":
@@ -59,7 +59,7 @@ export function pacienteSizeLabel(size?: string | null): string {
 
 /** Short abbreviation (P / M / G / GG) for badges and tags. */
 export function pacienteSizeAbbrev(size?: string | null): string {
-  return normalizePetSize(size) ?? (size ? size.toUpperCase().slice(0, 2) : "?");
+  return normalizePacienteSize(size) ?? (size ? size.toUpperCase().slice(0, 2) : "?");
 }
 
 /** Select options using canonical codes as values. */

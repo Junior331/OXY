@@ -550,9 +550,9 @@ export default function HotelCrechePage() {
   const [modalClients, setModalClients] = useState<Client[]>([])
   const [modalClientsLoading, setModalClientsLoading] = useState(false)
   const [selectedClientId, setSelectedClientId] = useState('')
-  const [clientPets, setClientPets] = useState<Paciente[]>([])
-  const [clientPetsLoading, setClientPetsLoading] = useState(false)
-  const [selectedPetId, setSelectedPetId] = useState('')
+  const [clientPacientes, setClientPacientes] = useState<Paciente[]>([])
+  const [clientPacientesLoading, setClientPacientesLoading] = useState(false)
+  const [selectedPacienteId, setSelectedPacienteId] = useState('')
   const [newCheckinDate, setNewCheckinDate] = useState('')
   const [newCheckoutDate, setNewCheckoutDate] = useState('')
   const [newDailyRate, setNewDailyRate] = useState('')
@@ -667,27 +667,27 @@ export default function HotelCrechePage() {
 
   const handleSelectClientId = async (clientId: string) => {
     setSelectedClientId(clientId)
-    setSelectedPetId('')
-    setClientPets([])
+    setSelectedPacienteId('')
+    setClientPacientes([])
     if (!clientId) return
 
-    setClientPetsLoading(true)
+    setClientPacientesLoading(true)
     try {
       const pacientes = await clientService.getClientPets(clientId)
-      setClientPets(pacientes)
-      if (pacientes.length === 1) setSelectedPetId(pacientes[0].id)
+      setClientPacientes(pacientes)
+      if (pacientes.length === 1) setSelectedPacienteId(pacientes[0].id)
     } catch {
-      setClientPets([])
+      setClientPacientes([])
     } finally {
-      setClientPetsLoading(false)
+      setClientPacientesLoading(false)
     }
   }
 
   const handleOpenNewRes = () => {
     setSelectedClientId('')
-    setClientPets([])
-    setSelectedPetId('')
-    setClientPetsLoading(false)
+    setClientPacientes([])
+    setSelectedPacienteId('')
+    setClientPacientesLoading(false)
     setNewDailyRate('')
     setNewEmergencyContact('')
     setNewResError('')
@@ -708,7 +708,7 @@ export default function HotelCrechePage() {
 
   const handleCreateReservation = async () => {
     if (!selectedClientId) { setNewResError('Selecione um cliente.'); return }
-    if (!selectedPetId) { setNewResError('Selecione um paciente.'); return }
+    if (!selectedPacienteId) { setNewResError('Selecione um paciente.'); return }
     if (!newCheckinDate) { setNewResError('Informe a data de check-in.'); return }
     if (!newCheckoutDate) {
       setNewResError(activeTab === 'daycare' ? 'Informe o último dia na creche.' : 'Informe a data de check-out.')
@@ -754,7 +754,7 @@ export default function HotelCrechePage() {
 
       await lodgingReservationService.create({
         client_id: selectedClientId,
-        paciente_id: selectedPetId,
+        paciente_id: selectedPacienteId,
         type: activeTab,
         checkin_date: newCheckinDate,
         checkout_date: checkoutForApi,
@@ -1028,18 +1028,18 @@ export default function HotelCrechePage() {
             <p className="mb-1.5 text-sm font-medium text-[#434A57] dark:text-[#f5f9fc]">Paciente</p>
             {!selectedClientId ? (
               <p className="mt-3 text-sm text-[#727B8E]">Selecione um cliente para ver os pacientes.</p>
-            ) : clientPetsLoading ? (
+            ) : clientPacientesLoading ? (
               <div className="mt-3 flex items-center gap-2 rounded-lg border border-[#727B8E]/20 bg-[#F4F6F9] p-3 dark:border-[#40485A] dark:bg-[#212225]">
                 <Loader2 className="h-4 w-4 animate-spin text-[#1E62EC]" />
                 <span className="text-sm text-[#727B8E]">Carregando pacientes do cliente...</span>
               </div>
-            ) : clientPets.length === 0 ? (
+            ) : clientPacientes.length === 0 ? (
               <p className="mt-3 text-sm text-[#727B8E]">Nenhum paciente cadastrado para este cliente.</p>
             ) : (
               <PacienteCombobox
-                pacientes={clientPets}
-                value={selectedPetId}
-                onChange={setSelectedPetId}
+                pacientes={clientPacientes}
+                value={selectedPacienteId}
+                onChange={setSelectedPacienteId}
                 placeholder="Selecione um paciente..."
                 disabled={newResLoading}
               />

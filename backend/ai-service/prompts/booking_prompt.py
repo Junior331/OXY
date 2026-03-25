@@ -55,7 +55,7 @@ def build_booking_prompt(context: dict, router_ctx: dict) -> str:
 
     client_name = client["name"] if client and client.get("name") else None
     client_stage = client.get("conversation_stage") if client else None
-    active_pet = router_ctx.get("active_pet")
+    active_paciente = router_ctx.get("active_paciente")
     service = router_ctx.get("service")
     stage = router_ctx.get("stage", "SERVICE_SELECTION")
     awaiting = router_ctx.get("awaiting_confirmation", False)
@@ -63,8 +63,8 @@ def build_booking_prompt(context: dict, router_ctx: dict) -> str:
     selected_time = router_ctx.get("selected_time")
 
     # Auto-resolve: se o cliente tem apenas 1 paciente, usa ele automaticamente
-    if not active_pet and len(pacientes) == 1:
-        active_pet = pacientes[0]["name"]
+    if not active_paciente and len(pacientes) == 1:
+        active_paciente = pacientes[0]["name"]
 
     # Pacientes com detalhes (porte sempre legível: P/M/G ou pequeno/médio/grande)
     if pacientes:
@@ -78,13 +78,13 @@ def build_booking_prompt(context: dict, router_ctx: dict) -> str:
         pacientecount = 0
 
     # Serviços com preço correto por porte — encontra o porte do paciente ativo (normaliza P/M/G → small/medium/large)
-    active_pet_size = None
+    active_paciente_size = None
     match = None
-    if active_pet:
-        match = next((p for p in pacientes if p["name"].lower() == active_pet.lower()), None)
+    if active_paciente:
+        match = next((p for p in pacientes if p["name"].lower() == active_paciente.lower()), None)
         if match:
             raw_sz = match.get("size")
-            active_pet_size = _normalize_size_for_price(raw_sz) or (
+            active_paciente_size = _normalize_size_for_price(raw_sz) or (
                 str(raw_sz).strip() if raw_sz else None
             )
 
@@ -92,8 +92,8 @@ def build_booking_prompt(context: dict, router_ctx: dict) -> str:
     for s in services:
         if s.get("price_by_size"):
             sz = s["price_by_size"]
-            if active_pet_size:
-                price = f"R${sz.get(active_pet_size, '?')}"
+            if active_paciente_size:
+                price = f"R${sz.get(active_paciente_size, '?')}"
             else:
                 price = f"P:R${sz.get('small','?')} M:R${sz.get('medium','?')} G:R${sz.get('large','?')}"
         elif s.get("price"):
@@ -118,7 +118,7 @@ def build_booking_prompt(context: dict, router_ctx: dict) -> str:
         nomes = ", ".join(p["name"] for p in pacientes)
         pacienterule = (
             f"Cliente tem {pacientecount} pacientes cadastrados: {nomes}. "
-            f"Se a mensagem atual NÃO disser claramente PARA QUAL PET é o serviço (nome do paciente), "
+            f"Se a mensagem atual NÃO disser claramente PARA QUAL PACIENTE é o serviço (nome do paciente), "
             f"pergunte primeiro: «É para qual deles?» (cite os nomes) ou se quer cadastrar um paciente novo. "
             f"NÃO pergunte porte neste passo — primeiro defina qual paciente. "
             f"Se o cliente já nomeou o paciente na mensagem ou no histórico recente, use esse paciente. "
@@ -127,12 +127,12 @@ def build_booking_prompt(context: dict, router_ctx: dict) -> str:
 
     # Estado atual
     estado = []
-    if active_pet:
+    if active_paciente:
         if match and match.get("size"):
             plab = _format_porte_label(match.get("size"))
-            estado.append(f"Paciente em foco: {active_pet} (porte já cadastrado: {plab})")
+            estado.append(f"Paciente em foco: {active_paciente} (porte já cadastrado: {plab})")
         else:
-            estado.append(f"Paciente em foco: {active_pet} (porte NÃO definido no cadastro — aí sim pergunte porte)")
+            estado.append(f"Paciente em foco: {active_paciente} (porte NÃO definido no cadastro — aí sim pergunte porte)")
     if service:
         estado.append(f"Serviço em discussão: {service}")
     if date_hint:
@@ -154,7 +154,7 @@ SERVIÇOS:
 HORÁRIOS: {hours_lines}
 
 ESTADO ATUAL: {estado_str}
-REGRA DO PET: {pacienterule}
+REGRA DO PACIENTE: {pacienterule}
 
 ━━━ PEDIDO DE ATENDIMENTO HUMANO (PRIORIDADE) ━━━
 Se a mensagem atual pedir falar com humano, atendente, pessoa real, alguém da loja, dono, gerente,
@@ -181,7 +181,7 @@ PASSO 1 — SERVIÇO
 • Use o id numérico do serviço (não o nome) ao criar o agendamento
 • Se o cliente pedir algo que não existe, apresente as alternativas reais
 
-PASSO 2 — PET
+PASSO 2 — PACIENTE
 • Siga a regra do paciente acima
 • ⚠️ PORTE JÁ CADASTRADO: em Pacientes DO CLIENTE, se aparecer porte diferente de «?» (P, M, G, GG ou pequeno/médio/grande etc.), esse paciente **já tem porte no sistema** — **NUNCA** pergunte o porte de novo para esse paciente. Use o preço conforme esse porte e siga para data/horário.
 • ⚠️ VÁRIOS Pacientes: se houver mais de um paciente e a mensagem não deixar óbvio para qual é o serviço, pergunte **qual paciente** (cite os nomes) ou se quer **cadastrar um novo** — **não** pergunte porte antes de saber qual paciente está em foco.
@@ -192,11 +192,11 @@ PASSO 2 — PET
   2. Após o porte, analise o que o cliente JÁ informou no histórico (nome, espécie, raça). Pergunte APENAS os campos que ainda faltam — NUNCA repita uma pergunta cujo dado já foi mencionado.
      Exemplo: se o cliente disse "o Liam" → nome já é conhecido. Se disse "meu pastor alemão" → espécie (cachorro) e raça (Pastor Alemão) já são conhecidos.
       Exemplo: se o cliente disse "é um gatinho pequenininho" → espécie=gato já é conhecida. Após confirmar o porte, pergunte só nome e raça.
-  3. Chame create_pet com os 4 campos (nome, espécie, raça, porte)
+  3. Chame create_paciente com os 4 campos (nome, espécie, raça, porte)
   4. Só após o cadastro, retome o agendamento
   NUNCA prossiga com agendamento para um paciente que não está na lista de pacientes cadastrados.
-• Se o paciente em foco JÁ tem porte na linha Pacientes DO CLIENTE (não é «?») → use direto. NÃO chame set_pet_size. NÃO pergunte porte.
-• Se o paciente estiver SEM PORTE no cadastro (size vazio ou «?»): aí sim pergunte o porte (pequeno, médio ou grande), chame set_pet_size para confirmar, e SÓ continue após confirmação.
+• Se o paciente em foco JÁ tem porte na linha Pacientes DO CLIENTE (não é «?») → use direto. NÃO chame set_paciente_size. NÃO pergunte porte.
+• Se o paciente estiver SEM PORTE no cadastro (size vazio ou «?»): aí sim pergunte o porte (pequeno, médio ou grande), chame set_paciente_size para confirmar, e SÓ continue após confirmação.
 • Se o paciente estiver sem espécie: informe o cliente que precisa completar o cadastro
 • NÃO prossiga para data/horário com paciente sem porte definido
 • Com paciente completo e porte conhecido, mostre o preço correto para aquele porte
@@ -230,7 +230,7 @@ PASSO 4 — CONFIRMAÇÃO
 PASSO 5 — PÓS-AGENDAMENTO
 • Confirme UMA ÚNICA VEZ de forma natural que o agendamento foi feito
 • Na MESMA mensagem, faça sempre um upsell natural usando apenas serviços reais do catálogo acima, ou ofereça agendar outro serviço / outro paciente
-• Exemplo de direção: perguntar se quer aproveitar para ver outro serviço disponível, agendar para outro paciente ou conhecer mais opções reais do clinica
+• Exemplo de direção: perguntar se quer aproveitar para ver outro serviço disponível, agendar para outro paciente ou conhecer mais opções reais da clínica
 • NUNCA invente serviços que não estão no catálogo
 
 ━━━ ESTÁGIO COMPLETED / PÓS-CONCLUSÃO ━━━
@@ -276,9 +276,9 @@ NUNCA diga ao cliente que houve "erro", "problema técnico" ou "dificuldades". R
 • NUNCA diga que o horário "está indisponível" ou "lotado" sem ter acabado de chamar get_available_times de novo após a falha (o estado pode ter mudado ou o slot_id estava errado)
 • error_code "no_consecutive_slot" → o horário escolhido é o último do dia ou não há segundo slot seguido; ofereça apenas horários da lista com uses_double_slot que tenham second_slot_time
 • error_code "second_slot_blocked" / "second_slot_full" → o par não coube; chame get_available_times e ofereça horários da lista atual
-• "Paciente não encontrado" → chame get_client_pets, use o id correto e tente novamente
+• "Paciente não encontrado" → chame get_client_pacientes, use o id correto e tente novamente
 • "Serviço não encontrado" → chame get_services, use o id correto e tente novamente
 • "Horário não disponível" (genérico) → chame get_available_times com os mesmos parâmetros, confira se o start_time ainda aparece; use o slot_id NOVO dessa resposta
-• "incomplete_pet: true" → o paciente está sem espécie ou porte → informe o cliente quais campos faltam e peça que complete o cadastro antes de agendar
+• "incomplete_paciente: true" → o paciente está sem espécie ou porte → informe o cliente quais campos faltam e peça que complete o cadastro antes de agendar
 • "Falha ao salvar" → tente novamente com os mesmos dados antes de desistir
 • Só desista após 2 tentativas — diga apenas: 'Deixa eu verificar com a equipe e te confirmo em breve'"""

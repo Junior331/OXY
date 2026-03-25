@@ -1,6 +1,6 @@
 export interface Professional {
   id: string
-  petshop_id: number
+  clinica_id: number
   name: string
   email?: string
   phone?: string
@@ -20,7 +20,7 @@ export interface Professional {
 }
 
 export interface ProfessionalCreate {
-  petshop_id: number
+  clinica_id: number
   name: string
   email?: string
   phone?: string

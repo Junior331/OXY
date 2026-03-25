@@ -27,7 +27,7 @@ logger = logging.getLogger("ai-service.tools.booking")
 DOUBLE_PAIR_PREFIX = "__DOUBLE_PAIR__:"
 
 
-def _price_key_for_pet_size(raw: str | None) -> str | None:
+def _price_key_for_paciente_size(raw: str | None) -> str | None:
     """
     Converte porte do banco (P/M/G/GG ou texto em inglês) para chaves típicas de price_by_size
     (small / medium / large).
@@ -60,7 +60,7 @@ def _price_key_for_pet_size(raw: str | None) -> str | None:
     return None
 
 
-def _resolve_price_charged_from_service_and_pet(service_row: dict, pacienterow: dict):
+def _resolve_price_charged_from_service_and_paciente(service_row: dict, pacienterow: dict):
     """Prioriza price_by_size alinhado ao porte do paciente; fallback para price fixo."""
     price_charged = service_row.get("price")
     price_by_size = service_row.get("price_by_size")
@@ -72,7 +72,7 @@ def _resolve_price_charged_from_service_and_pet(service_row: dict, pacienterow: 
     rs = str(raw).strip()
     if rs in price_by_size:
         return price_by_size[rs]
-    pk = _price_key_for_pet_size(rs)
+    pk = _price_key_for_paciente_size(rs)
     if pk and pk in price_by_size:
         return price_by_size[pk]
     # GG: alguns catálogos só têm "large"
@@ -530,7 +530,7 @@ def build_booking_tools(company_id: int, client_id) -> list:
         Cria um agendamento. Exige confirmed=True — nunca criar sem confirmação explícita do cliente.
 
         Args:
-            pacienteid: ID do paciente (obtido via get_client_pets)
+            pacienteid: ID do paciente (obtido via get_client_pacientes)
             service_id: ID do serviço (obtido via get_services)
             slot_id: ID do slot (obtido via get_available_times)
             confirmed: Deve ser True — só confirmar após aceite explícito do cliente
@@ -603,7 +603,7 @@ def build_booking_tools(company_id: int, client_id) -> list:
                 "success": False,
                 "message": (
                     f"pacienteid inválido: '{pacienteid}' não é um UUID. "
-                    "Chame get_client_pets para obter o ID correto do paciente antes de agendar."
+                    "Chame get_client_pacientes para obter o ID correto do paciente antes de agendar."
                 ),
             }
         if not _is_uuid(slot_id):
@@ -643,23 +643,23 @@ def build_booking_tools(company_id: int, client_id) -> list:
             if not pacienterow:
                 return {
                     "success": False,
-                    "message": f"Paciente id={pacienteid} não encontrado. Chame get_client_pets para obter os IDs corretos.",
+                    "message": f"Paciente id={pacienteid} não encontrado. Chame get_client_pacientes para obter os IDs corretos.",
                 }
 
             # Bloqueia agendamento se o cadastro do paciente estiver incompleto
-            missing_pet_fields = []
+            missing_paciente_fields = []
             if not pacienterow.get("species"):
-                missing_pet_fields.append("espécie (cachorro ou gato)")
+                missing_paciente_fields.append("espécie (cachorro ou gato)")
             if not pacienterow.get("size"):
-                missing_pet_fields.append(
+                missing_paciente_fields.append(
                     "porte (pequeno (P), médio (M), grande (G) ou extra grande (GG))"
                 )
-            if missing_pet_fields:
+            if missing_paciente_fields:
                 return {
                     "success": False,
-                    "incomplete_pet": True,
-                    "missing_fields": missing_pet_fields,
-                    "message": f"Cadastro do paciente incompleto. Faltam: {', '.join(missing_pet_fields)}. O cliente deve completar o cadastro antes de agendar.",
+                    "incomplete_paciente": True,
+                    "missing_fields": missing_paciente_fields,
+                    "message": f"Cadastro do paciente incompleto. Faltam: {', '.join(missing_paciente_fields)}. O cliente deve completar o cadastro antes de agendar.",
                 }
 
             # Verifica vaga no slot
@@ -781,7 +781,7 @@ def build_booking_tools(company_id: int, client_id) -> list:
                     }
 
             # Calcula preço cobrado: prioriza price_by_size (chaves EN) com porte P/M/G/GG do banco
-            price_charged = _resolve_price_charged_from_service_and_pet(service_row, pacienterow)
+            price_charged = _resolve_price_charged_from_service_and_paciente(service_row, pacienterow)
 
             logger.info(
                 "price_charged calculado: %s (pacientesize=%s, price_by_size=%s, price_fixo=%s)",

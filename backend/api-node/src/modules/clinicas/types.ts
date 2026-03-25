@@ -1,4 +1,4 @@
-export interface CreatePetshopDTO {
+export interface CreateClinicaDTO {
   company_id: number
   address?: string
   cep?: string
@@ -10,7 +10,7 @@ export interface CreatePetshopDTO {
   assistant_name?: string
 }
 
-export interface UpdatePetshopDTO {
+export interface UpdateClinicaDTO {
   address?: string
   cep?: string
   phone?: string
@@ -22,7 +22,7 @@ export interface UpdatePetshopDTO {
   is_active?: boolean
 }
 
-export interface PetshopListQuery {
+export interface ClinicaListQuery {
   skip?: number
   limit?: number
   is_active?: string

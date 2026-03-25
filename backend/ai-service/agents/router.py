@@ -90,7 +90,7 @@ def _must_reprocess_verificar(agent_name: str, run_output, reply: str) -> bool:
     return True
 
 
-def _resolve_service_and_pet_ids(context: dict, router_ctx: dict) -> tuple:
+def _resolve_service_and_paciente_ids(context: dict, router_ctx: dict) -> tuple:
     """Resolve service_id, specialty_id e pacienteid a partir do contexto carregado + JSON do router."""
     services = context.get("services") or []
     pacientes = context.get("pacientes") or []
@@ -104,7 +104,7 @@ def _resolve_service_and_pet_ids(context: dict, router_ctx: dict) -> tuple:
                 specialty_id = s.get("specialty_id")
                 break
     pacienteid = None
-    active = (router_ctx.get("active_pet") or "").strip()
+    active = (router_ctx.get("active_paciente") or "").strip()
     if active:
         al = active.lower()
         for p in pacientes:
@@ -137,7 +137,7 @@ def _booking_availability_snapshot_block(context: dict, router_ctx: dict) -> str
     if not company_id or not client_id:
         return ""
 
-    service_id, specialty_id, pacienteid = _resolve_service_and_pet_ids(context, router_ctx)
+    service_id, specialty_id, pacienteid = _resolve_service_and_paciente_ids(context, router_ctx)
     if not specialty_id and not service_id:
         return ""
 
@@ -192,7 +192,7 @@ VALID_AGENTS = {
 DEFAULT_ROUTER_CTX = {
     "agent": "onboarding_agent",
     "stage": "WELCOME",
-    "active_pet": None,
+    "active_paciente": None,
     "service": None,
     "date_mentioned": None,
     "selected_time": None,
@@ -223,10 +223,10 @@ async def run_router(message: str, context: dict, history: list) -> dict:
 
     agent_name = router_ctx.get("agent", "onboarding_agent")
     logger.info(
-        "Router decidiu → agent=%s | stage=%s | active_pet=%s | service=%s | date=%s | awaiting_confirmation=%s",
+        "Router decidiu → agent=%s | stage=%s | active_paciente=%s | service=%s | date=%s | awaiting_confirmation=%s",
         agent_name,
         router_ctx.get("stage"),
-        router_ctx.get("active_pet"),
+        router_ctx.get("active_paciente"),
         router_ctx.get("service"),
         router_ctx.get("date_mentioned"),
         router_ctx.get("awaiting_confirmation"),
@@ -325,8 +325,8 @@ def _format_history(history: list) -> str:
 def _build_specialist_input(message: str, history: list, router_ctx: dict) -> str:
     history_text = _format_history(history)
     ctx_summary = []
-    if router_ctx.get("active_pet"):
-        ctx_summary.append(f"Paciente ativo: {router_ctx['active_pet']}")
+    if router_ctx.get("active_paciente"):
+        ctx_summary.append(f"Paciente ativo: {router_ctx['active_paciente']}")
     if router_ctx.get("service"):
         ctx_summary.append(f"Serviço: {router_ctx['service']}")
     if router_ctx.get("date_mentioned"):
