@@ -326,8 +326,8 @@ model ClinicaPaciente {
   lodgings             ClinicaLodging[]
   lodgingReservations  ClinicaLodgingReservation[]
 
-  @@index([companyId], map: "idx_pets_company")
-  @@index([clientId], map: "idx_pets_client")
+  @@index([companyId], map: "idx_pacientes_company")
+  @@index([clientId], map: "idx_pacientes_client")
   @@map("clinica_pacientes")
 }
 
@@ -379,7 +379,7 @@ model ClinicaAppointment {
   @@index([slotId],       map: "idx_appointments_slot")
   @@index([companyId],    map: "idx_appointments_company")
   @@index([clientId],     map: "idx_appointments_client")
-  @@index([pacienteId],   map: "idx_appointments_pet")
+  @@index([pacienteId],   map: "idx_appointments_paciente")
   @@index([scheduledDate], map: "idx_appointments_date")
   @@index([status],       map: "idx_appointments_status")
   @@map("clinica_appointments")
@@ -411,7 +411,7 @@ model ClinicaLodging {
   specialty ClinicaSpecialty? @relation(fields: [specialtyId], references: [id])
 
   @@index([companyId, checkinDate, checkoutDate], map: "idx_lodgings_company_dates")
-  @@index([pacienteId], map: "idx_lodgings_pet")
+  @@index([pacienteId], map: "idx_lodgings_paciente")
   @@index([clientId],   map: "idx_lodgings_client")
   @@map("clinica_lodgings")
 }
@@ -484,7 +484,7 @@ model ClinicaLodgingReservation {
 
   @@index([companyId], map: "idx_lodging_res_company")
   @@index([clientId],  map: "idx_lodging_res_client")
-  @@index([pacienteId], map: "idx_lodging_res_pet")
+  @@index([pacienteId], map: "idx_lodging_res_paciente")
   @@index([companyId, checkinDate, checkoutDate], map: "idx_lodging_res_dates")
   @@index([companyId, type, checkinDate],         map: "idx_lodging_res_type")
   @@map("clinica_lodging_reservations")

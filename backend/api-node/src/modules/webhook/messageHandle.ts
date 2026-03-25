@@ -62,7 +62,7 @@ function getClientIdentifierFromJid(jid: string): string {
 
 const ROUTER_STAGE_TO_CRM_STAGE: Record<string, string> = {
   WELCOME: 'initial',
-  PET_REGISTRATION: 'onboarding',
+  PATIENT_REGISTRATION: 'onboarding',
   SERVICE_SELECTION: 'booking',
   SCHEDULING: 'booking',
   AWAITING_CONFIRMATION: 'booking',
