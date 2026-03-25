@@ -34,7 +34,7 @@ export async function chatBusiness(req: Request, res: Response) {
       upcoming_appointments,
       total_clients,
       new_clients_week,
-      total_pets,
+      total_pacientes,
       services,
       recent_appointments,
       messages_today,
@@ -104,7 +104,7 @@ Agendamentos nos próximos 7 dias: ${appointments_week}
 Mensagens recebidas hoje: ${messages_today}
 Clientes ativos: ${total_clients}
 Novos clientes (últimos 30 dias): ${new_clients_week}
-Total de pacientes cadastrados: ${total_pets}
+Total de pacientes cadastrados: ${total_pacientes}
 Faturamento dos últimos 30 dias: R$ ${revenue_month.toFixed(2)}
 
 ━━━ PRÓXIMOS AGENDAMENTOS ━━━

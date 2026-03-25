@@ -8,7 +8,7 @@ import {
   updateClient,
   deleteClient,
   getClientConversations,
-  getClientPets,
+  getClientPacientes,
   getClientContext,
   getClientActivities,
   importClients,
@@ -44,7 +44,7 @@ router.delete('/:clientId', deleteClient)
 router.get('/:clientId/conversations', getClientConversations)
 
 // GET /clients/:clientId/pacientes - Get client pacientes
-router.get('/:clientId/pacientes', getClientPets)
+router.get('/:clientId/pacientes', getClientPacientes)
 
 // GET /clients/:clientId/context - Get client context for AI
 router.get('/:clientId/context', getClientContext)
