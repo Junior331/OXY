@@ -350,22 +350,22 @@ export default function CalendarioPage() {
   );
 
   useEffect(() => {
-    const fetchClientPets = async () => {
+    const fetchClientPacientes = async () => {
       if (!formData.clientId) {
         setClientPacientes([]);
         setClientPacientesLoading(false);
         return;
       }
       const cacheKey = `${formData.clientId}|${clinicaId || 0}`;
-      const cachedPets = clientPacientesCache.current.get(cacheKey);
-      if (cachedPets) {
-        setClientPacientes(cachedPets);
+      const cachedPacientes = clientPacientesCache.current.get(cacheKey);
+      if (cachedPacientes) {
+        setClientPacientes(cachedPacientes);
         setClientPacientesLoading(false);
         return;
       }
       setClientPacientesLoading(true);
       try {
-        const pacientes = await clientService.getClientPets(
+        const pacientes = await clientService.getClientPacientes(
           formData.clientId,
           clinicaId || undefined,
         );
@@ -382,7 +382,7 @@ export default function CalendarioPage() {
         setClientPacientesLoading(false);
       }
     };
-    fetchClientPets();
+    fetchClientPacientes();
   }, [formData.clientId, clinicaId, toast]);
 
   const bookableServices = useMemo(
@@ -644,7 +644,7 @@ export default function CalendarioPage() {
     }
   };
 
-  const handleCreatePet = async () => {
+  const handleCreatePaciente = async () => {
     const errs: FormErrors = {};
     if (!newPacienteName.trim()) errs.newPacienteName = "Nome do paciente é obrigatório";
     if (!newPacienteSpecies) errs.newPacienteSpecies = "Espécie é obrigatória";
@@ -657,7 +657,7 @@ export default function CalendarioPage() {
 
     setIsCreatingPaciente(true);
     try {
-      const newPaciente = await pacienteService.createPet({
+      const newPaciente = await pacienteService.createPaciente({
         clinica_id: clinicaId,
         client_id: formData.clientId,
         name: newPacienteName,
@@ -832,11 +832,11 @@ export default function CalendarioPage() {
         notes: formData.notes || undefined,
         payment_method: "manual",
         origin_channel: "dashboard",
-        paciente_name: selectedPet?.name ?? undefined,
-        paciente_species: selectedPet?.species ?? undefined,
-        paciente_breed: selectedPet?.breed ?? undefined,
-        paciente_size: selectedPet?.size ?? undefined,
-        paciente_age: selectedPet?.age?.toString() ?? undefined,
+        paciente_name: selectedPaciente?.name ?? undefined,
+        paciente_species: selectedPaciente?.species ?? undefined,
+        paciente_breed: selectedPaciente?.breed ?? undefined,
+        paciente_size: selectedPaciente?.size ?? undefined,
+        paciente_age: selectedPaciente?.age?.toString() ?? undefined,
       });
 
       const refreshed = await appointmentService.listAppointments();
@@ -853,7 +853,7 @@ export default function CalendarioPage() {
           : selectedSlot.time;
       toast.success(
         "Agendamento criado",
-        `${selectedPet?.name ?? "O paciente"} foi agendado para ${timeMsg}.`,
+        `${selectedPaciente?.name ?? "O paciente"} foi agendado para ${timeMsg}.`,
       );
     } catch (error) {
       console.error("Erro ao criar agendamento:", error);
@@ -1150,11 +1150,11 @@ export default function CalendarioPage() {
                   </div>
                   <button
                     type="button"
-                    disabled={isCreatingPet}
-                    onClick={handleCreatePet}
+                    disabled={isCreatingPaciente}
+                    onClick={handleCreatePaciente}
                     className="flex w-full items-center justify-center gap-1.5 rounded-lg bg-[#0e1629] py-2 text-sm font-medium text-white hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70 dark:bg-[#2172e5]"
                   >
-                    {isCreatingPet ? (
+                    {isCreatingPaciente ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
                         Criando Paciente...

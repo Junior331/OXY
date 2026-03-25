@@ -12,7 +12,7 @@ const meta = {
   argTypes: {
     image: {
       control: 'select',
-      options: ['bored', 'video_call', 'pets_not_found', 'not_found_clientes_ativos'],
+      options: ['bored', 'video_call', 'pacientes_not_found', 'not_found_clientes_ativos'],
     },
     title: {
       control: 'text',
@@ -46,7 +46,7 @@ export const Default: Story = {
 
 export const WithButton: Story = {
   args: {
-    image: 'pets_not_found',
+    image: 'pacientes_not_found',
     title: 'Nenhum paciente cadastrado',
     description: 'Cadastre o primeiro paciente para começar a gerenciar seus agendamentos.',
     buttonText: 'Cadastrar Paciente',
@@ -87,7 +87,7 @@ export const AllVariants: Story = {
         description="Tente ajustar os filtros."
       />
       <EmptyState
-        image="pets_not_found"
+        image="pacientes_not_found"
         description="Nenhum paciente encontrado."
       />
       <EmptyState

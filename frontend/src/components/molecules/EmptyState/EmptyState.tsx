@@ -6,7 +6,7 @@ export interface EmptyStateProps {
   image:
     | "bored"
     | "video_call"
-    | "pets_not_found"
+    | "pacientes_not_found"
     | "not_found_clientes_ativos";
   title?: string;
   description: string;

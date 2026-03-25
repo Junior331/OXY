@@ -100,7 +100,7 @@ export function PacienteList({
 
       {pacientes.length === 0 ? (
         <EmptyState
-          image="pets_not_found"
+          image="pacientes_not_found"
           title="Nenhum paciente cadastrado"
           description="Adicione o primeiro paciente deste cliente"
           buttonText="Cadastrar Paciente"

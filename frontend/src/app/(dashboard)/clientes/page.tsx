@@ -90,7 +90,7 @@ interface Customer {
   status: "ativo" | "inativo";
   address?: string;
   notes?: string;
-  petsCount: number;
+  pacientesCount: number;
   totalAppointments: number;
   lastVisit: string;
   pacientes: Paciente[];
@@ -283,8 +283,8 @@ function ClientsSidebar({
                     </span>
                   </div>
                   <p className="text-xs text-[#727B8E] dark:text-[#8a94a6] mt-1">
-                    {customer.petsCount} paciente
-                    {customer.petsCount !== 1 ? "s" : ""} •{" "}
+                    {customer.pacientesCount} paciente
+                    {customer.pacientesCount !== 1 ? "s" : ""} •{" "}
                     {formatClientPhoneForSidebar(getClientPhoneDisplay(customer))}
                   </p>
                   <p className="text-xs text-[#727B8E] dark:text-[#8a94a6] mt-0.5">
@@ -327,14 +327,14 @@ function CustomerDetails({
   onBack,
   onEditCustomer,
   onDeleteCustomer,
-  onDeletePet,
+  onDeletePaciente,
   onDeleteAppointment,
   deletingAppointmentId,
-  onSavePet,
+  onSavePaciente,
   onOpenConversation,
   activeTab,
   onTabChange,
-  loadingPets,
+  loadingPacientes,
   loadingAppointments,
   loadingConversations,
 }: {
@@ -352,7 +352,7 @@ function CustomerDetails({
   onOpenConversation: (conversationId: string) => void;
   activeTab: "pacientes" | "agendamentos" | "conversas";
   onTabChange: (tab: "pacientes" | "agendamentos" | "conversas") => void;
-  loadingPets?: boolean;
+  loadingPacientes?: boolean;
   loadingAppointments?: boolean;
   loadingConversations?: boolean;
 }) {
@@ -529,7 +529,7 @@ function CustomerDetails({
             }`}
           >
             <PawPrint className="h-4 w-4" />
-            Pacientes ({customer.petsCount})
+            Pacientes ({customer.pacientesCount})
           </button>
           <button
             type="button"
@@ -573,7 +573,7 @@ function CustomerDetails({
                   Novo Paciente
                 </Button>
               </div>
-              {loadingPets ? (
+              {loadingPacientes ? (
                 <div className="flex h-32 items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-[#1E62EC]" />
                 </div>
@@ -889,7 +889,7 @@ const emptyCustomerForm = {
 type ApiClient = Client & {
   isActive?: boolean;
   totalAppointments?: number | null;
-  totalPets?: number | null;
+  totalPacientes?: number | null;
   totalConversations?: number | null;
 };
 
@@ -1057,7 +1057,7 @@ function parseWeightKg(weightValue: string): number | undefined {
 function clientToCustomer(c: ApiClient): Customer {
   const phoneDisplay = formatPhoneForDisplay(c.phone ?? "");
   const isActive = c.is_active ?? c.isActive ?? true;
-  const petsCount = c.total_pets ?? c.totalPets ?? 0;
+  const pacientesCount = c.total_pacientes ?? c.totalPacientes ?? 0;
 
   return {
     id: c.id,
@@ -1068,7 +1068,7 @@ function clientToCustomer(c: ApiClient): Customer {
     status: isActive ? "ativo" : "inativo",
     address: undefined,
     notes: c.notes ?? undefined,
-    petsCount,
+    pacientesCount,
     totalAppointments: c.total_appointments ?? c.totalAppointments ?? 0,
     lastVisit: "",
     pacientes: [],
@@ -1222,7 +1222,7 @@ export default function ClientesPage() {
         setCustomers((prev) =>
           prev.map((c) =>
             c.id === customerId
-              ? { ...c, pacientes: mappedPacientes, petsCount: mappedPacientes.length }
+              ? { ...c, pacientes: mappedPacientes, pacientesCount: mappedPacientes.length }
               : c,
           ),
         );
@@ -1393,7 +1393,7 @@ export default function ClientesPage() {
             ? {
                 ...c,
                 pacientes: c.pacientes.filter((p) => p.id !== pacienteId),
-                petsCount: Math.max(c.petsCount - 1, 0),
+                pacientesCount: Math.max(c.pacientesCount - 1, 0),
               }
             : c,
         ),
@@ -1548,7 +1548,7 @@ export default function ClientesPage() {
               if (c.id !== selectedCustomer.id) return c;
               return {
                 ...c,
-                petsCount: c.petsCount + 1,
+                pacientesCount: c.pacientesCount + 1,
                 pacientes: [...c.pacientes, newPaciente],
               };
             }),

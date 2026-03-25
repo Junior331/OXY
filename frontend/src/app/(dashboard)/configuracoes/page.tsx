@@ -1996,7 +1996,7 @@ const LODGING_DAY_NAMES = [
   { dayOfWeek: 0, key: "sunday", label: "Domingo" },
 ] as const;
 
-/** Dias fechados vêm da aba Agenda (`petshop_business_hours`). */
+/** Dias fechados vêm da aba Agenda (`clinica_business_hours`). */
 function isLodgingDayClosedFromAgenda(
   agendaDays: AgendaDay[] | null,
   dayOfWeek: number,
@@ -2133,7 +2133,7 @@ function HospedagemContent() {
         daycare_checkout_time: daycareCheckoutTime,
       });
 
-      // Salva capacidades (hotel/daycare) consolidando agenda (petshop_business_hours) + is_active
+      // Salva capacidades (hotel/daycare) consolidando agenda (clinica_business_hours) + is_active
       const capacities = LODGING_DAY_NAMES.flatMap(({ dayOfWeek }) => {
         const closed = isLodgingDayClosedFromAgenda(daysForSave, dayOfWeek);
         const hotelActive = !closed && (hotelActiveByDay[dayOfWeek] ?? true);

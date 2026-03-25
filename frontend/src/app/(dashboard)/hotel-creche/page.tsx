@@ -272,7 +272,7 @@ function PacienteCombobox({
     return () => document.removeEventListener('mousedown', onDoc)
   }, [open])
 
-  const labelForPet = (p: Paciente) => {
+  const labelForPaciente = (p: Paciente) => {
     const bits = [p.name ?? 'Paciente']
     if (p.species) bits.push(p.species)
     if (p.breed) bits.push(p.breed)
@@ -293,7 +293,7 @@ function PacienteCombobox({
         }}
         className="relative flex h-[47px] w-full items-center justify-between rounded-lg border border-[#727B8E]/20 bg-white px-3 text-sm text-[#434A57] dark:bg-[#212225] dark:border-[#40485A] dark:text-[#f5f9fc] hover:border-[#1E62EC]/40 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <span className="truncate">{value && selected ? labelForPet(selected) : placeholder}</span>
+        <span className="truncate">{value && selected ? labelForPaciente(selected) : placeholder}</span>
         {loading ? (
           <Loader2 className="h-4 w-4 animate-spin text-[#727B8E]" />
         ) : (
@@ -328,7 +328,7 @@ function PacienteCombobox({
                     setQuery('')
                   }}
                 >
-                  {labelForPet(p)}
+                  {labelForPaciente(p)}
                 </button>
               ))
             )}
@@ -673,7 +673,7 @@ export default function HotelCrechePage() {
 
     setClientPacientesLoading(true)
     try {
-      const pacientes = await clientService.getClientPets(clientId)
+      const pacientes = await clientService.getClientPacientes(clientId)
       setClientPacientes(pacientes)
       if (pacientes.length === 1) setSelectedPacienteId(pacientes[0].id)
     } catch {

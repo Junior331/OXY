@@ -11,7 +11,7 @@ import company_logoRaw from "./company_logo.png";
 import cleber_santosRaw from "./cleber_santos.png";
 import page_not_foundRaw from "./page_not_found.png";
 import hero_dashboardRaw from "./hero_dashboard.png";
-import pets_not_foundRaw from "./not_found_clientes_ativos.png";
+import pacientes_not_foundRaw from "./pacientes_not_found.png";
 import bg_video_feedback_cardRaw from "./bg_video_feedback_card.png";
 import not_found_clientes_ativosRaw from "./not_found_clientes_ativos.png";
 
@@ -33,7 +33,7 @@ export const images: Record<string, ImageObject> = {
   cleber_santos: { src: cleber_santosRaw },
   page_not_found: { src: page_not_foundRaw },
   hero_dashboard: { src: hero_dashboardRaw },
-  pets_not_found: { src: pets_not_foundRaw },
+  pacientes_not_found: { src: pacientes_not_foundRaw },
   bg_video_feedback_card: { src: bg_video_feedback_cardRaw },
   not_found_clientes_ativos: { src: not_found_clientes_ativosRaw },
 };
