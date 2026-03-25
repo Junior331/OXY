@@ -5,7 +5,7 @@ export interface ClientHeaderProps {
   name: string
   phone?: string
   pacientes?: string
-  onAddPet?: () => void
+  onAddPaciente?: () => void
   className?: string
 }
 
@@ -47,7 +47,7 @@ export function ClientHeader({
   name,
   phone,
   pacientes,
-  onAddPet,
+  onAddPaciente,
   className,
 }: ClientHeaderProps) {
   return (
@@ -73,7 +73,7 @@ export function ClientHeader({
       </div>
 
       <div className="flex items-center gap-2">
-        <Button onClick={onAddPet} size="sm" className="bg-[#0e1629] dark:bg-[#2172e5] text-white hover:opacity-90">
+        <Button onClick={onAddPaciente} size="sm" className="bg-[#0e1629] dark:bg-[#2172e5] text-white hover:opacity-90">
           <AuzapIcon className="h-4 w-4" />
           Novo Paciente
         </Button>

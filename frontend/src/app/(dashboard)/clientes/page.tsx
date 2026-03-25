@@ -1695,7 +1695,7 @@ export default function ClientesPage() {
           onOpenConversation={handleOpenConversation}
           activeTab={activeTab}
           onTabChange={handleTabChange}
-          loadingPets={loadingPacientes}
+          loadingPacientes={loadingPacientes}
           loadingAppointments={loadingAppointments}
           loadingConversations={loadingConversations}
         />

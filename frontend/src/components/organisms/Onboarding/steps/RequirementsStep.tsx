@@ -80,7 +80,7 @@ export function RequirementsStep({ currentStep, totalSteps, data, onNext }: Requ
           </label>
           <textarea
             id="produtosVenda"
-            placeholder="ex: Ração Premier; Brinquedos; Caminhas; Petiscos; Coleiras personalizadas..."
+            placeholder="ex: Rações; Medicamentos; Acessórios; Suplementos; Produtos de higiene..."
             className="flex min-h-[80px] w-full rounded-[4px] border border-[#727B8E]/10 bg-[#FAFAFA] px-[19px] py-[13px] font-be-vietnam-pro text-sm text-[#434A57] placeholder:text-[#727B8E]/50 outline-none transition-colors focus:border-[#1E62EC] focus:ring-1 focus:ring-[#1E62EC]/30 resize-none"
             {...register('produtosVenda', { required: 'Campo obrigatório' })}
           />

@@ -82,7 +82,7 @@ export const Selected: Story = {
   },
 }
 
-export const NoPets: Story = {
+export const NoPacientes: Story = {
   args: {
     name: 'Pedro Souza',
     lastMessage: 'Olá, vocês atendem gatos também?',

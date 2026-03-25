@@ -43,7 +43,7 @@ export const AiInactive: Story = {
   },
 }
 
-export const NoPets: Story = {
+export const NoPacientes: Story = {
   args: {
     name: 'Ana Paula Oliveira',
     phone: '(11) 97777-7777',
