@@ -9,7 +9,7 @@ function shapeClient(client: any) {
     is_active: client.isActive,
     total_appointments:
       _count?.appointments ?? client.total_appointments ?? undefined,
-    total_pets: _count?.pacientes ?? client.total_pets ?? undefined,
+    total_pacientes: _count?.pacientes ?? client.total_pacientes ?? undefined,
     total_conversations:
       _count?.conversations ?? client.total_conversations ?? undefined,
   }
